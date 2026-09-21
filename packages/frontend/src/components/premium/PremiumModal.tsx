@@ -25,7 +25,7 @@ export function PremiumModal({ open, onClose, currentToken }: Props) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${currentToken}`,
         },
-        body: JSON.stringify({ payment_method: 'card', amount: 999 }),
+        body: JSON.stringify({ payment_method: 'card', amount: 499 }),
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error.message);
@@ -88,9 +88,9 @@ export function PremiumModal({ open, onClose, currentToken }: Props) {
             <div className="p-6 space-y-4">
               <div className="bg-surface-overlay rounded-xl p-4 border border-surface-edge">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold text-white">Premium</span>
+                  <span className="text-sm font-semibold text-white">Creador Pro</span>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold text-white">$9.99</span>
+                    <span className="text-2xl font-bold text-white">$4.99</span>
                     <span className="text-xs text-text-muted">/mes</span>
                   </div>
                 </div>
