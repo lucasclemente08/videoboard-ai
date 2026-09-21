@@ -14,6 +14,7 @@ import { commentsRouter } from './routes/comments';
 import { aiRouter } from './routes/ai';
 import { exportRouter } from './routes/export';
 import { premiumRouter } from './routes/premium';
+import { presetsRouter } from './routes/presets';
 import { apiDocsRoute } from './routes/docs';
 
 export function createApp() {
@@ -53,6 +54,7 @@ export function createApp() {
   app.use('/api/ai', aiRouter);
   app.use('/api/export', exportRouter);
   app.use('/api/premium', premiumRouter);
+  app.use('/api/presets', presetsRouter);
 
   app.use(notFound);
   app.use(errorHandler);

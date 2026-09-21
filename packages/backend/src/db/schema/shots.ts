@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, real, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, real, jsonb, timestamp } from 'drizzle-orm/pg-core';
 import { scenes } from './scenes';
 
 export const shots = pgTable('shots', {
@@ -20,6 +20,8 @@ export const shots = pgTable('shots', {
   reference_url: text('reference_url'),
   ai_frame_prompt: text('ai_frame_prompt'),
   camera_letter: text('camera_letter'),
+  camera_setup: jsonb('camera_setup'),
+  lighting_setup: jsonb('lighting_setup'),
   sort_order: integer('sort_order').default(0).notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

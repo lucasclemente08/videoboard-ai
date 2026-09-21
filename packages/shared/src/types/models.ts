@@ -109,6 +109,8 @@ export interface Shot {
   reference_url: string | null;
   ai_frame_prompt: string | null;
   camera_letter: string | null;
+  camera_setup?: Record<string, any> | null;
+  lighting_setup?: Record<string, any> | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

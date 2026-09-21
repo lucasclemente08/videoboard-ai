@@ -10,6 +10,7 @@ import { api } from '../../api/client';
 import { clsx } from 'clsx';
 import type { Shot } from '@videoboard/shared';
 import { mediaDragState } from '../../services/eventBus';
+import { CameraLightingEditor } from './CameraLightingEditor';
 
 const shotTypeLabels: Record<string, string> = {
   close_up: 'Primer plano', medium_shot: 'Plano medio', american_shot: 'Plano americano',
@@ -427,6 +428,11 @@ export function ShotListPanel({ sceneId }: { sceneId: string }) {
                     CÁM {shot.camera_letter}
                   </span>
                 )}
+                {(shot as any).camera_setup?.camera_model && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-accent-blue/10 text-accent-blue border border-accent-blue/20">
+                    {(shot as any).camera_setup.camera_model.split(' ')[0]} · {(shot as any).camera_setup.lens || shot.lens}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2 text-2xs text-text-muted mt-0.5">
                 {shot.shot_type && <span>{shotTypeLabels[shot.shot_type] || shot.shot_type}</span>}
@@ -556,6 +562,17 @@ export function ShotListPanel({ sceneId }: { sceneId: string }) {
                   rows={2}
                   placeholder="Ajustes de iluminación, marcas de enfoque, audio de referencia..."
                   className="w-full px-3 py-2 bg-surface-raised border border-surface-edge rounded-lg text-xs text-text-primary focus:outline-none focus:border-accent-blue transition-all resize-none"
+                />
+              </div>
+
+              {/* Camera & Lighting Setup Presets + 2D Overhead Diagram */}
+              <div>
+                <label className="block text-2xs font-semibold text-text-primary mb-1">
+                  Setup de Cámara & Iluminación (Presets y Diagrama Cenital 2D)
+                </label>
+                <CameraLightingEditor
+                  shot={shot}
+                  onUpdate={(data) => updateShot.mutate({ id: shot.id, ...data } as any)}
                 />
               </div>
             </div>

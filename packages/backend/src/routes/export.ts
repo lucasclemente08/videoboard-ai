@@ -121,6 +121,14 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
     const projectCharacters = await db.select().from(characters).where(eq(characters.project_id, projectId));
     const projectLocations = await db.select().from(locations).where(eq(locations.project_id, projectId));
 
+    let allShots: any[] = [];
+    for (const sc of projectScenes) {
+      try {
+        const scShots = await db.select().from(shots).where(eq(shots.scene_id, sc.id)).orderBy(asc(shots.sort_order));
+        allShots = [...allShots, ...scShots.map((sh: any) => ({ ...sh, sceneTitle: sc.title }))];
+      } catch {}
+    }
+
     const totalSeconds = projectScenes.reduce((acc, s) => acc + (s.estimated_duration_secs || 5), 0);
 
     const watermarkHtml = !req.isPremium ? `
@@ -207,6 +215,30 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
         <div class="grid-item">
           <strong>${l.name}</strong><br>
           <span style="color: #6b7280;">Dirección: ${l.address || 'Por definir'}</span>
+        </div>
+      `).join('')}
+    </div>
+  ` : ''}
+
+  ${allShots.length > 0 ? `
+    <div class="section-title">Plan Técnico de Cámara & Esquemas de Iluminación (${allShots.length} Tomas)</div>
+    <div class="grid">
+      ${allShots.map(sh => `
+        <div class="grid-item" style="border-left: 3px solid #3b82f6;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <strong>${sh.name} ${sh.camera_letter ? `<span class="badge">CÁM ${sh.camera_letter}</span>` : ''}</strong>
+            <span style="font-size:0.75rem; color:#6b7280;">${sh.sceneTitle || ''} &bull; ${sh.estimated_duration_secs || 5}s</span>
+          </div>
+          <div style="font-size: 0.85rem; color: #374151; line-height: 1.4;">
+            <span style="color: #2563eb; font-weight:600;">Cámara & Óptica:</span> ${sh.camera_setup?.camera_model || 'Cámara Principal'} | Lente ${sh.camera_setup?.lens || sh.lens || '35mm'} (${sh.camera_setup?.aperture || 'f/2.0'}) | ${sh.fps || 24}fps | ISO ${sh.camera_setup?.iso || 800}<br>
+            <span style="color: #4b5563;">Perfil / Shutter:</span> ${sh.camera_setup?.color_profile || 'Rec.709'} &bull; ${sh.camera_setup?.shutter_speed || '1/48'} ${sh.camera_setup?.nd_filter ? `&bull; ${sh.camera_setup.nd_filter}` : ''}<br>
+            ${sh.lighting_setup?.key_light?.type ? `
+              <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e5e7eb;">
+                <span style="color: #d97706; font-weight:600;">Iluminación:</span> Key: ${sh.lighting_setup.key_light.type} (${sh.lighting_setup.key_light.color_temp || '5600K'}) &bull; Fill: ${sh.lighting_setup.fill_light?.type || 'Rebote'} &bull; Rim: ${sh.lighting_setup.back_light?.type || 'Luz de contra'}
+              </div>
+            ` : ''}
+            ${sh.notes ? `<div style="margin-top: 4px; font-style: italic; color: #6b7280;">Nota: ${sh.notes}</div>` : ''}
+          </div>
         </div>
       `).join('')}
     </div>
