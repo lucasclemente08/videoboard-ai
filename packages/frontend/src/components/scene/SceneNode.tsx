@@ -155,9 +155,12 @@ export const SceneNode = memo(({ data, selected }: NodeProps) => {
               <p className="text-2xs text-text-muted line-clamp-2 mb-1">{scene.description}</p>
             )}
 
-            <div className="flex items-center justify-between mt-auto pt-2 border-t border-surface-edge">
-              <span className="text-2xs text-text-muted flex items-center gap-1"><Clock className="w-3 h-3" />{scene.estimated_duration_secs}s</span>
-              {dragOver && <span className="text-2xs text-accent-green flex items-center gap-1"><Upload className="w-3 h-3" />Soltar</span>}
+            <div className="flex items-center justify-between mt-auto pt-2 border-t border-surface-edge text-2xs text-text-muted">
+              <span className="flex items-center gap-1 shrink-0 font-medium">
+                <Clock className="w-3 h-3 shrink-0 text-text-muted" />
+                {scene.estimated_duration_secs || 0}s
+              </span>
+              {dragOver && <span className="text-accent-green flex items-center gap-1 font-semibold"><Upload className="w-3 h-3 shrink-0" />Soltar</span>}
             </div>
           </div>
         </>

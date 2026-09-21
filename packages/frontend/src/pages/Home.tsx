@@ -58,51 +58,58 @@ export function Home() {
           </button>
         </div>
 
-        {/* Project Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {/* New Project Card */}
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setShowNewModal(true)}
-            className="aspect-[4/3] rounded-2xl border-2 border-dashed border-surface-edge hover:border-accent-blue/50 flex flex-col items-center justify-center gap-2 group transition-all"
-          >
-            <div className="w-10 h-10 rounded-xl bg-surface-raised group-hover:bg-accent-blue/10 flex items-center justify-center transition-colors">
-              <Plus className="w-5 h-5 text-text-muted group-hover:text-accent-blue transition-colors" />
-            </div>
-            <span className="text-xs font-medium text-text-muted group-hover:text-accent-blue transition-colors">
-              Nuevo proyecto
-            </span>
-          </motion.button>
-
-          {/* Skeletons */}
-          {isLoading &&
-            Array.from({ length: 3 }).map((_, i) => (
+        {/* Skeletons while loading */}
+        {isLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="aspect-[4/3] rounded-2xl bg-surface-raised animate-pulse border border-surface-edge" />
             ))}
+          </div>
+        )}
 
-          {/* Project Cards */}
-          {projects?.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              onClick={() => navigate(`/project/${project.id}`)}
-              onDelete={(e) => handleDelete(e, project.id)}
-            />
-          ))}
-        </div>
+        {/* Project Grid when projects exist */}
+        {!isLoading && projects && projects.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {/* New Project Card */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowNewModal(true)}
+              className="aspect-[4/3] rounded-2xl border-2 border-dashed border-surface-edge hover:border-accent-blue/50 flex flex-col items-center justify-center gap-2 group transition-all"
+            >
+              <div className="w-10 h-10 rounded-xl bg-surface-raised group-hover:bg-accent-blue/10 flex items-center justify-center transition-colors">
+                <Plus className="w-5 h-5 text-text-muted group-hover:text-accent-blue transition-colors" />
+              </div>
+              <span className="text-xs font-medium text-text-muted group-hover:text-accent-blue transition-colors">
+                Nuevo proyecto
+              </span>
+            </motion.button>
+
+            {/* Project Cards */}
+            {projects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onClick={() => navigate(`/project/${project.id}`)}
+                onDelete={(e) => handleDelete(e, project.id)}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Empty State when 0 projects and not loading */}
         {!isLoading && (!projects || projects.length === 0) && (
-          <div className="mt-12 py-16 text-center border-2 border-dashed border-surface-edge rounded-3xl max-w-lg mx-auto p-8">
-            <FolderGit2 className="w-12 h-12 text-text-muted mx-auto mb-3 opacity-30" />
-            <h3 className="text-sm font-semibold text-text-primary">Comienza tu primer guion y storyboard</h3>
-            <p className="text-xs text-text-muted mt-1 mb-5">
-              Crea un proyecto para organizar escenas, tomas de cámara, elenco y sincronizar en tiempo real con tu equipo.
+          <div className="py-16 text-center border-2 border-dashed border-surface-edge rounded-3xl max-w-lg mx-auto p-8 bg-surface-raised/40 backdrop-blur-sm">
+            <div className="w-14 h-14 rounded-2xl bg-accent-blue/10 text-accent-blue flex items-center justify-center mx-auto mb-4">
+              <FolderGit2 className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-text-primary">Comienza tu primer guion y storyboard</h3>
+            <p className="text-xs text-text-muted mt-1.5 mb-6 max-w-sm mx-auto leading-relaxed">
+              Crea un proyecto para estructurar escenas, tomas de cámara, elenco y sincronizar en tiempo real con tu equipo.
             </p>
             <button
               onClick={() => setShowNewModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-accent-blue text-white text-xs font-semibold rounded-xl hover:bg-accent-blue/90 transition-all shadow-sm"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-blue text-white text-xs font-semibold rounded-xl hover:bg-accent-blue-hover transition-all shadow-md"
             >
               <Plus className="w-4 h-4" /> Crear mi primer proyecto
             </button>

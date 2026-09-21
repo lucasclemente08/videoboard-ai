@@ -16,6 +16,7 @@ export function AttentionMap() {
   let currentSecond = 0;
 
   sorted.forEach((scene) => {
+    const sceneDuration = Number(scene.estimated_duration_secs) || 5;
     // Base attention score based on scene properties
     let score = 0.65; // baseline
 
@@ -23,14 +24,14 @@ export function AttentionMap() {
     if (scene.emotion === 'urgent' || scene.emotion === 'epic') score += 0.1;
     if (scene.priority === 'critical' || scene.priority === 'high') score += 0.1;
     if (scene.emotion === 'serious' || scene.emotion === 'technical') score -= 0.1;
-    if (scene.estimated_duration_secs > 30) score -= 0.05; // long scenes lose attention
+    if (sceneDuration > 30) score -= 0.05; // long scenes lose attention
 
     score = Math.max(0, Math.min(1, score));
 
     const risk = score < 0.4 ? 'high' as const : score < 0.6 ? 'medium' as const : 'low' as const;
 
     points.push({
-      second: currentSecond + scene.estimated_duration_secs / 2,
+      second: currentSecond + sceneDuration / 2,
       score,
       risk,
       suggestion: risk === 'high'
@@ -40,7 +41,7 @@ export function AttentionMap() {
         : undefined,
     });
 
-    currentSecond += scene.estimated_duration_secs;
+    currentSecond += sceneDuration;
   });
 
   const chartWidth = 800;
@@ -48,8 +49,14 @@ export function AttentionMap() {
   const paddingX = 60;
   const paddingY = 30;
 
-  const scaleX = (sec: number) => paddingX + (sec / totalDuration) * (chartWidth - paddingX * 2);
-  const scaleY = (val: number) => chartHeight - paddingY - val * (chartHeight - paddingY * 2);
+  const scaleX = (sec: number) => {
+    const safeSec = Number.isFinite(sec) ? sec : 0;
+    return paddingX + (safeSec / Math.max(totalDuration, 1)) * (chartWidth - paddingX * 2);
+  };
+  const scaleY = (val: number) => {
+    const safeVal = Number.isFinite(val) ? val : 0.5;
+    return chartHeight - paddingY - safeVal * (chartHeight - paddingY * 2);
+  };
 
   const getColor = (score: number) => {
     if (score >= 0.7) return '#10B981';
@@ -89,8 +96,9 @@ export function AttentionMap() {
 
             {/* Bars */}
             {points.map((p, i) => {
-              const barWidth = Math.max(20, (chartWidth - paddingX * 2) / points.length - 4);
-              const x = scaleX(p.second) - barWidth / 2;
+              const barWidth = Math.max(20, (chartWidth - paddingX * 2) / Math.max(points.length, 1) - 4);
+              const rawX = scaleX(p.second) - barWidth / 2;
+              const x = Number.isFinite(rawX) ? rawX : paddingX;
               return (
                 <g key={i}>
                   <rect

@@ -411,9 +411,12 @@ export function ShotListPanel({ sceneId }: { sceneId: string }) {
           className="rounded-xl bg-surface border border-surface-edge overflow-hidden group shadow-sm hover:border-surface-hover transition-colors"
         >
           {/* Header */}
-          <button
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => setExpandedId(expandedId === shot.id ? null : shot.id)}
-            className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-surface-hover/50 transition-colors text-left"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedId(expandedId === shot.id ? null : shot.id); } }}
+            className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-surface-hover/50 transition-colors text-left cursor-pointer select-none"
           >
             <GripVertical className="w-3 h-3 text-text-muted shrink-0" />
             <div className="flex-1 min-w-0">
@@ -445,7 +448,7 @@ export function ShotListPanel({ sceneId }: { sceneId: string }) {
                 <ChevronRight className="w-4 h-4 text-text-muted" />
               )}
             </div>
-          </button>
+          </div>
 
           {/* Expanded */}
           {expandedId === shot.id && (

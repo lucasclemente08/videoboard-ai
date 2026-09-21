@@ -6,6 +6,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { SceneNode } from '../scene/SceneNode';
+import { Film, Plus } from 'lucide-react';
 import { StickyNode, ChecklistNode, CharacterNode, LocationNode, CameraNode, BudgetNode, RiskNode, FolderNode } from './nodes/ExtraNodes';
 import { useSceneStore } from '../../stores/useSceneStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
@@ -448,6 +449,29 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
           <Controls className="!bg-surface-raised !border-surface-edge !rounded-xl" />
           <MiniMap nodeColor={n => (n.data as any)?.scene?.color || '#3B82F6'} maskColor="rgba(10,10,11,0.7)" className="!bg-surface-raised !border-surface-edge !rounded-xl" />
         </ReactFlow>
+
+        {/* Onboarding Empty State */}
+        {scenes.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <div className="pointer-events-auto max-w-sm p-6 rounded-2xl bg-surface-raised/95 border border-surface-edge shadow-2xl backdrop-blur-xl text-center space-y-3 animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-12 h-12 rounded-2xl bg-accent-blue/15 text-accent-blue flex items-center justify-center mx-auto shadow-inner">
+                <Film className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-text-primary">Tu lienzo está listo</h3>
+                <p className="text-xs text-text-muted mt-1 leading-relaxed">
+                  Crea tu primera escena para comenzar a estructurar el guion, storyboard y tomas.
+                </p>
+              </div>
+              <button
+                onClick={() => addScene(200, 200)}
+                className="w-full py-2.5 px-4 rounded-xl bg-accent-blue hover:bg-accent-blue-hover text-white text-xs font-semibold transition-all shadow-md flex items-center justify-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" /> Crear primera escena
+              </button>
+            </div>
+          </div>
+        )}
 
         <LiveCursors cursors={cursors} />
 
