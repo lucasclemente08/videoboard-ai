@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, GripVertical, Camera, Clock, ChevronDown, ChevronRight,
   Trash2, Image, Upload, Music, Video, FileText, Loader2, Play,
-  Maximize2, X, ExternalLink, Sparkles
+  Maximize2, X, ExternalLink, Sparkles, Clapperboard, Star
 } from 'lucide-react';
 import { useShots, useCreateShot, useUpdateShot, useDeleteShot } from '../../api/hooks';
 import { api } from '../../api/client';
@@ -433,6 +433,12 @@ export function ShotListPanel({ sceneId }: { sceneId: string }) {
                     {(shot as any).camera_setup.camera_model.split(' ')[0]} · {(shot as any).camera_setup.lens || shot.lens}
                   </span>
                 )}
+                {shot.takes && shot.takes.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center gap-1">
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    {shot.takes.length} {shot.takes.length === 1 ? 'toma rodada' : 'tomas rodadas'}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2 text-2xs text-text-muted mt-0.5">
                 {shot.shot_type && <span>{shotTypeLabels[shot.shot_type] || shot.shot_type}</span>}
@@ -459,6 +465,38 @@ export function ShotListPanel({ sceneId }: { sceneId: string }) {
           {/* Expanded */}
           {expandedId === shot.id && (
             <div className="px-3 pb-3 space-y-3 border-t border-surface-edge pt-3">
+              {/* Takes summary if any */}
+              {shot.takes && shot.takes.length > 0 && (
+                <div className="p-2.5 rounded-xl bg-surface-raised border border-surface-edge space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-3xs uppercase font-bold text-text-muted tracking-wider">
+                      Tomas Rodadas ({shot.takes.length})
+                    </span>
+                    <span className="text-3xs text-emerald-500 font-semibold">
+                      {shot.takes.filter((t) => t.status === 'good').length} Circled / Buenas
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {shot.takes.map((tk) => (
+                      <span
+                        key={tk.id}
+                        className={clsx(
+                          'px-2 py-0.5 rounded text-3xs font-bold border',
+                          tk.status === 'good'
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                            : tk.status === 'hold'
+                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                            : 'bg-red-500/15 text-red-400 border-red-500/30'
+                        )}
+                        title={tk.notes || (tk.status === 'good' ? 'Toma buena (Circled)' : tk.status === 'hold' ? 'Respaldo' : 'Descartada')}
+                      >
+                        Toma {tk.take_number} ({tk.duration_seconds}s)
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* File upload & drop zone */}
               <div>
                 <label className="block text-2xs font-semibold text-text-primary mb-1.5">

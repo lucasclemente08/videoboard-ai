@@ -96,3 +96,62 @@ shotsRouter.delete('/:id', async (req: AuthRequest, res) => {
     res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
   }
 });
+
+// POST /api/shots/:id/takes - Add a recorded take to a shot
+shotsRouter.post('/:id/takes', async (req: AuthRequest, res) => {
+  try {
+    const shotRows = await db.select().from(shots).where(eq(shots.id, req.params.id));
+    if (shotRows.length === 0) {
+      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Toma no encontrada' } });
+      return;
+    }
+    const currentShot = shotRows[0];
+    const existingTakes: any[] = Array.isArray(currentShot.takes) ? currentShot.takes : [];
+    
+    const newTake = {
+      id: crypto.randomUUID(),
+      take_number: req.body.take_number || existingTakes.length + 1,
+      status: req.body.status || 'good', // 'good' | 'hold' | 'ng'
+      duration_seconds: Number(req.body.duration_seconds || 0),
+      timecode: req.body.timecode || '00:00:00:00',
+      notes: req.body.notes || null,
+      reason: req.body.reason || null,
+      created_at: new Date().toISOString(),
+    };
+
+    const updatedTakes = [...existingTakes, newTake];
+    const newStatus = newTake.status === 'good' ? 'filmed' : currentShot.status;
+
+    const updated = await db.update(shots)
+      .set({ takes: updatedTakes, status: newStatus, updated_at: new Date() })
+      .where(eq(shots.id, req.params.id))
+      .returning();
+
+    res.status(201).json({ data: { shot: updated[0], take: newTake }, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
+// DELETE /api/shots/:id/takes/:takeId - Remove a recorded take
+shotsRouter.delete('/:id/takes/:takeId', async (req: AuthRequest, res) => {
+  try {
+    const shotRows = await db.select().from(shots).where(eq(shots.id, req.params.id));
+    if (shotRows.length === 0) {
+      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Toma no encontrada' } });
+      return;
+    }
+    const currentShot = shotRows[0];
+    const existingTakes: any[] = Array.isArray(currentShot.takes) ? currentShot.takes : [];
+    const updatedTakes = existingTakes.filter((t: any) => t.id !== req.params.takeId);
+
+    const updated = await db.update(shots)
+      .set({ takes: updatedTakes, updated_at: new Date() })
+      .where(eq(shots.id, req.params.id))
+      .returning();
+
+    res.json({ data: updated[0], error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});

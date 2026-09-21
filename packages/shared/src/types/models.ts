@@ -90,6 +90,19 @@ export interface SceneConnection {
   created_at: string;
 }
 
+export type TakeStatus = 'good' | 'hold' | 'ng';
+
+export interface ShotTake {
+  id: string;
+  take_number: number;
+  status: TakeStatus;
+  duration_seconds: number;
+  timecode: string;
+  notes?: string | null;
+  reason?: string | null;
+  created_at: string;
+}
+
 export interface Shot {
   id: string;
   scene_id: string;
@@ -111,6 +124,7 @@ export interface Shot {
   camera_letter: string | null;
   camera_setup?: Record<string, any> | null;
   lighting_setup?: Record<string, any> | null;
+  takes?: ShotTake[];
   sort_order: number;
   created_at: string;
   updated_at: string;

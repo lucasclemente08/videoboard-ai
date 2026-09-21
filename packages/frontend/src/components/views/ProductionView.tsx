@@ -9,20 +9,31 @@ import {
   User, 
   Trash2, 
   Building, 
-  Film
+  Film,
+  Clapperboard,
+  Play,
+  Volume2,
+  Sparkles,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useParams } from 'react-router-dom';
 import { 
   useCharacters, useCreateCharacter, useDeleteCharacter,
   useLocations, useCreateLocation, useDeleteLocation,
-  useBudgetItems, useCreateBudgetItem, useDeleteBudgetItem
+  useBudgetItems, useCreateBudgetItem, useDeleteBudgetItem,
+  useScenes, useProject
 } from '../../api/hooks';
+import { SlateModal } from '../slate/SlateModal';
 
 export function ProductionView() {
   const { id: projectId } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState<'characters' | 'locations' | 'budget' | 'equipment'>('characters');
+  const [activeTab, setActiveTab] = useState<'characters' | 'locations' | 'budget' | 'equipment' | 'slate'>('characters');
+  const [slateOpen, setSlateOpen] = useState(false);
 
+  const { data: project } = useProject(projectId!);
+  const { data: scenes = [] } = useScenes(projectId!);
   const { data: characters = [] } = useCharacters(projectId!);
   const { data: locations = [] } = useLocations(projectId!);
   const { data: budgetItems = [] } = useBudgetItems(projectId!);
@@ -117,6 +128,7 @@ export function ProductionView() {
             { id: 'locations', label: 'Locaciones', icon: MapPin },
             { id: 'budget', label: 'Presupuesto', icon: DollarSign },
             { id: 'equipment', label: 'Equipamiento', icon: Camera },
+            { id: 'slate', label: 'Claqueta & Rodaje', icon: Clapperboard },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -124,7 +136,7 @@ export function ProductionView() {
               className={clsx(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
                 activeTab === tab.id
-                  ? 'bg-accent-blue text-white shadow-sm'
+                  ? (tab.id === 'slate' ? 'bg-red-600 text-white shadow-sm' : 'bg-accent-blue text-white shadow-sm')
                   : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
               )}
             >
@@ -134,13 +146,26 @@ export function ProductionView() {
           ))}
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-accent-blue text-white text-xs font-semibold hover:bg-accent-blue/90 transition-all shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Añadir {activeTab === 'characters' ? 'Personaje' : activeTab === 'locations' ? 'Locación' : activeTab === 'budget' ? 'Gasto' : 'Equipo'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSlateOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-red-600/15 text-red-400 border border-red-500/30 text-xs font-semibold hover:bg-red-600/25 transition-all shadow-sm"
+            title="Abrir Claqueta Digital en Pantalla Completa"
+          >
+            <Clapperboard className="w-3.5 h-3.5" />
+            <span>Claqueta en Set</span>
+          </button>
+
+          {activeTab !== 'slate' && (
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-accent-blue text-white text-xs font-semibold hover:bg-accent-blue/90 transition-all shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Añadir {activeTab === 'characters' ? 'Personaje' : activeTab === 'locations' ? 'Locación' : activeTab === 'budget' ? 'Gasto' : 'Equipo'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -311,6 +336,95 @@ export function ProductionView() {
             </div>
           </div>
         )}
+
+        {activeTab === 'slate' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                  <Clapperboard className="w-5 h-5 text-red-500" />
+                  <span>Modo Rodaje en Set & Continuista</span>
+                </h3>
+                <p className="text-xs text-text-muted">
+                  Herramienta de campo para tablet y móvil: claqueta sincronizada, código de tiempo y registro de tomas buenas (Circled takes) para el editor.
+                </p>
+              </div>
+            </div>
+
+            {/* Slate Hero Banner Card */}
+            <div className="p-6 md:p-8 rounded-2xl border-2 border-red-500/20 bg-gradient-to-br from-red-950/20 via-surface-raised to-surface flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+              <div className="space-y-3 max-w-xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-bold">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span>SINCRONIZACIÓN PROFESIONAL</span>
+                </div>
+                <h4 className="text-xl md:text-2xl font-black text-text-primary tracking-tight">
+                  Claqueta Digital Inteligente con Beep 1kHz y Destello
+                </h4>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Lleva tu iPad, tablet o laptop directamente al set. Marca cada toma, genera el tono de calibración de 1000 Hz para sincronizar grabadoras externas de sonido y clasifica tomas buenas (Circled), de respaldo (Hold) y descartadas (NG) en tiempo real.
+                </p>
+                <div className="flex flex-wrap items-center gap-4 text-2xs text-text-muted pt-1">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-accent-green" /> Tono 1kHz Web Audio
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-accent-green" /> Flash óptico 1-frame
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-accent-green" /> Exportación CSV para DaVinci / Premiere
+                  </span>
+                </div>
+              </div>
+
+              <div className="shrink-0 flex flex-col items-center gap-3">
+                <button
+                  onClick={() => setSlateOpen(true)}
+                  className="px-6 py-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-sm tracking-wider flex items-center gap-3 shadow-xl hover:shadow-red-600/30 active:scale-95 transition-all"
+                >
+                  <Clapperboard className="w-5 h-5" />
+                  <span>LANZAR CLAQUETA DE CAMPO</span>
+                </button>
+                <span className="text-3xs text-text-muted">Compatible con atajos de teclado (Espacio / R)</span>
+              </div>
+            </div>
+
+            {/* Quick Overview of Scenes in Project */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-5 rounded-2xl border border-surface-edge bg-surface-raised space-y-3">
+                <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-accent-amber" />
+                  <span>Plan de Rodaje por Escena ({scenes.length} escenas)</span>
+                </h4>
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {scenes.map((sc, i) => (
+                    <div key={sc.id} className="p-2.5 rounded-xl bg-surface border border-surface-edge flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded bg-surface-hover flex items-center justify-center font-bold text-3xs text-text-muted">
+                          {i + 1}
+                        </span>
+                        <span className="font-semibold text-text-primary truncate">{sc.title}</span>
+                      </div>
+                      <span className="text-2xs text-text-muted font-mono">{sc.estimated_duration_secs || 5}s est.</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-surface-edge bg-surface-raised space-y-3">
+                <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-accent-blue" />
+                  <span>Buenas Prácticas para el Set</span>
+                </h4>
+                <ul className="text-2xs text-text-secondary space-y-2 leading-relaxed">
+                  <li>• <strong>Orientación:</strong> Coloca la tableta frente a la cámara principal antes de cantar la escena y toma.</li>
+                  <li>• <strong>Sincronización:</strong> Mantén el volumen de la tableta al 100% para que el micrófono de caña (boom) capture con claridad el beep de 1kHz.</li>
+                  <li>• <strong>Circled Takes:</strong> Marca inmediatamente las tomas que el director elija como buenas para que el reporte CSV guíe directamente al editor de montaje.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quick Add Modal */}
@@ -403,6 +517,14 @@ export function ProductionView() {
           </>
         )}
       </AnimatePresence>
+
+      <SlateModal
+        open={slateOpen}
+        onClose={() => setSlateOpen(false)}
+        projectId={projectId!}
+        projectTitle={project?.title}
+        scenes={scenes}
+      />
     </div>
   );
 }

@@ -22,6 +22,7 @@ export const shots = pgTable('shots', {
   camera_letter: text('camera_letter'),
   camera_setup: jsonb('camera_setup'),
   lighting_setup: jsonb('lighting_setup'),
+  takes: jsonb('takes'),
   sort_order: integer('sort_order').default(0).notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

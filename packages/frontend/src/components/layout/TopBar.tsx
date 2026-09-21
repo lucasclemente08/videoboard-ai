@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Film, ChevronLeft, Share2, MoreHorizontal, Users, History, Download, Check, Copy, Sparkles, Crown, LogOut, ChevronDown, Play } from 'lucide-react';
+import { Film, ChevronLeft, Share2, MoreHorizontal, Users, History, Download, Check, Copy, Sparkles, Crown, LogOut, ChevronDown, Play, Clapperboard } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSceneStore } from '../../stores/useSceneStore';
@@ -7,6 +7,7 @@ import { useAIStore } from '../../stores/useAIStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { PremiumModal } from '../premium/PremiumModal';
 import { AnimaticModal } from '../animatic/AnimaticModal';
+import { SlateModal } from '../slate/SlateModal';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
@@ -25,6 +26,7 @@ export function TopBar() {
   const [copied, setCopied] = useState(false);
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [animaticOpen, setAnimaticOpen] = useState(false);
+  const [slateOpen, setSlateOpen] = useState(false);
   const premiumActive = user?.isPremium || false;
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -102,6 +104,14 @@ export function TopBar() {
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               <span>Animatic</span>
+            </button>
+            <button
+              onClick={() => setSlateOpen(true)}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30 transition-all flex items-center gap-1.5 shadow-sm mr-1"
+              title="Abrir Claqueta Digital y Modo Rodaje en Set"
+            >
+              <Clapperboard className="w-3.5 h-3.5" />
+              <span>Claqueta</span>
             </button>
             <button className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors" title="Colaboradores">
               <Users className="w-4 h-4 text-text-muted" />
@@ -226,13 +236,22 @@ export function TopBar() {
       </div>
       <PremiumModal open={premiumOpen} onClose={() => setPremiumOpen(false)} currentToken={token} />
       {isInProject && (
-        <AnimaticModal
-          open={animaticOpen}
-          onClose={() => setAnimaticOpen(false)}
-          projectId={projectId}
-          projectTitle={currentProject?.title}
-          scenes={scenes || []}
-        />
+        <>
+          <AnimaticModal
+            open={animaticOpen}
+            onClose={() => setAnimaticOpen(false)}
+            projectId={projectId}
+            projectTitle={currentProject?.title}
+            scenes={scenes || []}
+          />
+          <SlateModal
+            open={slateOpen}
+            onClose={() => setSlateOpen(false)}
+            projectId={projectId}
+            projectTitle={currentProject?.title}
+            scenes={scenes || []}
+          />
+        </>
       )}
     </header>
   );
