@@ -52,4 +52,25 @@ export const api = {
 
   delete: <T>(endpoint: string) =>
     request<T>(endpoint, { method: 'DELETE' }),
+
+  uploadFile: async (file: File, meta?: { projectId?: string; shotId?: string; sceneId?: string }) => {
+    return new Promise<{ id: string; name: string; url: string; type: string; size: number }>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const res = await api.post<{ id: string; name: string; url: string; type: string; size: number }>('/assets/upload', {
+            fileName: file.name,
+            fileData: reader.result as string,
+            mimeType: file.type,
+            ...meta,
+          });
+          resolve(res);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(new Error('Error al leer el archivo'));
+      reader.readAsDataURL(file);
+    });
+  },
 };

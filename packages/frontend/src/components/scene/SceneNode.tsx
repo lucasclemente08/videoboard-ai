@@ -15,8 +15,16 @@ const emotionEmojis: Record<string, string> = {
   inspiring: '✨', urgent: '⚡', funny: '😂', epic: '🔥', serious: '🎯', technical: '⚙️',
 };
 
+const statusLabels: Record<string, { label: string; color: string }> = {
+  draft: { label: 'Borrador', color: 'bg-zinc-500/20 text-zinc-400' },
+  writing: { label: 'Guion', color: 'bg-accent-blue/20 text-accent-blue' },
+  ready: { label: 'Aprobada', color: 'bg-accent-green/20 text-accent-green' },
+  shooting: { label: 'Rodaje', color: 'bg-accent-violet/20 text-accent-violet' },
+  done: { label: 'Listo', color: 'bg-emerald-500/20 text-emerald-400' },
+};
+
 function isImageUrl(url: string): boolean {
-  return /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url) || url.includes('pexels.com');
+  return /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url) || url.includes('pexels.com') || url.startsWith('/uploads/');
 }
 
 export const SceneNode = memo(({ data, selected }: NodeProps) => {
@@ -104,10 +112,28 @@ export const SceneNode = memo(({ data, selected }: NodeProps) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+              {scene.status && statusLabels[scene.status] && (
+                <span className={clsx('px-1.5 py-0.5 rounded text-[9px] font-bold border', statusLabels[scene.status].color)}>
+                  {statusLabels[scene.status].label}
+                </span>
+              )}
               {scene.scene_type && <span className="px-1.5 py-0.5 rounded-md bg-surface border border-surface-edge text-2xs text-text-secondary capitalize">{scene.scene_type}</span>}
               {scene.emotion && <span className="text-xs">{emotionEmojis[scene.emotion]}</span>}
             </div>
+
+            {scene.tags && scene.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                {scene.tags.slice(0, 3).map((tag) => (
+                  <span key={tag} className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-accent-amber/15 text-accent-amber border border-accent-amber/25">
+                    #{tag}
+                  </span>
+                ))}
+                {scene.tags.length > 3 && (
+                  <span className="text-[8px] text-text-muted">+{scene.tags.length - 3}</span>
+                )}
+              </div>
+            )}
 
             {/* FULL detail at high zoom */}
             {showFull && (

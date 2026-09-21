@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import { eq, desc } from '../config/database';
 import { db } from '../config/database';
 import { assets } from '../db/schema/assets';
@@ -6,6 +9,79 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth';
 
 export const assetsRouter = Router();
 assetsRouter.use(authMiddleware);
+
+// POST /api/assets/upload
+assetsRouter.post('/upload', async (req: AuthRequest, res) => {
+  try {
+    const { fileName, fileData, mimeType, projectId, shotId, sceneId } = req.body;
+    if (!fileName || !fileData) {
+      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'fileName y fileData son requeridos' } });
+      return;
+    }
+
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Extract base64 payload if it includes data: prefix
+    let base64Payload = fileData;
+    let detectedMime = mimeType || 'application/octet-stream';
+    if (typeof fileData === 'string' && fileData.startsWith('data:')) {
+      const parts = fileData.split(',');
+      const meta = parts[0];
+      base64Payload = parts[1];
+      const match = meta.match(/data:(.*?);base64/);
+      if (match) detectedMime = match[1];
+    }
+
+    const buffer = Buffer.from(base64Payload, 'base64');
+    const ext = path.extname(fileName) || (detectedMime.includes('image') ? '.jpg' : detectedMime.includes('video') ? '.mp4' : detectedMime.includes('audio') ? '.mp3' : '.bin');
+    const safeBaseName = path.basename(fileName, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const uniqueFileName = `${Date.now()}_${uuidv4().slice(0, 8)}_${safeBaseName}${ext}`;
+    const filePath = path.join(uploadsDir, uniqueFileName);
+
+    fs.writeFileSync(filePath, buffer);
+
+    const publicUrl = `/uploads/${uniqueFileName}`;
+    const fileType = detectedMime.startsWith('image/') ? 'image' : detectedMime.startsWith('video/') ? 'video' : detectedMime.startsWith('audio/') ? 'audio' : 'document';
+
+    let assetId = uuidv4();
+    if (projectId) {
+      try {
+        const [asset] = await db.insert(assets).values({
+          project_id: projectId,
+          scene_id: sceneId || null,
+          shot_id: shotId || null,
+          name: fileName,
+          type: fileType,
+          url: publicUrl,
+          thumbnail_url: fileType === 'image' ? publicUrl : null,
+          size_bytes: buffer.length,
+          notes: null,
+          tags: [],
+        }).returning();
+        if (asset) assetId = asset.id;
+      } catch (err) {
+        console.warn('Could not insert asset row in DB, returning file info:', err);
+      }
+    }
+
+    res.status(201).json({
+      data: {
+        id: assetId,
+        name: fileName,
+        url: publicUrl,
+        type: fileType,
+        size: buffer.length,
+        mimeType: detectedMime,
+      },
+      error: null,
+    });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
 
 // GET /api/assets/pexels?query=...&type=photo|video
 assetsRouter.get('/pexels', async (req: AuthRequest, res) => {
