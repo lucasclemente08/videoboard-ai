@@ -2,17 +2,40 @@ import { Router } from 'express';
 import { eq, asc } from '../config/database';
 import { db } from '../config/database';
 import { shots } from '../db/schema/shots';
+import { scenes } from '../db/schema/scenes';
 import { authMiddleware, type AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/projectAccess';
 
 export const shotsRouter = Router();
 shotsRouter.use(authMiddleware);
 
-// GET /api/shots?scene_id=...
+// GET /api/shots?scene_id=... or GET /api/shots?project_id=...
 shotsRouter.get('/', async (req: AuthRequest, res) => {
   try {
     const sceneId = req.query.scene_id as string;
+    const projectId = req.query.project_id as string;
+
+    if (projectId) {
+      const hasAccess = await hasProjectAccess(projectId, req.userId);
+      if (!hasAccess) {
+        res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para ver las tomas de este proyecto' } });
+        return;
+      }
+
+      const pScenes = await db.select().from(scenes).where(eq(scenes.project_id, projectId)).orderBy(asc(scenes.sort_order));
+      let allShots: any[] = [];
+      for (const sc of pScenes) {
+        try {
+          const scShots = await db.select().from(shots).where(eq(shots.scene_id, sc.id)).orderBy(asc(shots.sort_order));
+          allShots = [...allShots, ...scShots.map((sh: any) => ({ ...sh, scene_title: sc.title, scene_order: sc.sort_order, scene_color: sc.color }))];
+        } catch {}
+      }
+      res.json({ data: allShots, error: null });
+      return;
+    }
+
     if (!sceneId) {
-      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'scene_id es requerido' } });
+      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'scene_id o project_id es requerido' } });
       return;
     }
     const rows = await db.select().from(shots)

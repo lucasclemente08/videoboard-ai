@@ -1,10 +1,12 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Film, ChevronLeft, Share2, MoreHorizontal, Users, History, Download, Check, Copy, Sparkles, Crown, LogOut, ChevronDown } from 'lucide-react';
+import { Film, ChevronLeft, Share2, MoreHorizontal, Users, History, Download, Check, Copy, Sparkles, Crown, LogOut, ChevronDown, Play } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useSceneStore } from '../../stores/useSceneStore';
 import { useAIStore } from '../../stores/useAIStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { PremiumModal } from '../premium/PremiumModal';
+import { AnimaticModal } from '../animatic/AnimaticModal';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
@@ -15,11 +17,14 @@ export function TopBar() {
   const navigate = useNavigate();
   const { toggleSidebar, sidebarOpen, viewMode } = useUIStore();
   const { currentProject } = useProjectStore();
+  const { scenes } = useSceneStore();
   const { toggleAIPanel } = useAIStore();
   const { token, user, logout } = useAuthStore();
   const isInProject = location.pathname.startsWith('/project/');
+  const projectId = isInProject ? location.pathname.split('/')[2] : '';
   const [copied, setCopied] = useState(false);
   const [premiumOpen, setPremiumOpen] = useState(false);
+  const [animaticOpen, setAnimaticOpen] = useState(false);
   const premiumActive = user?.isPremium || false;
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -90,6 +95,14 @@ export function TopBar() {
       <div className="flex items-center gap-1">
         {isInProject && (
           <>
+            <button
+              onClick={() => setAnimaticOpen(true)}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25 border border-accent-blue/30 transition-all flex items-center gap-1.5 shadow-sm mr-1"
+              title="Reproducir Storyboard Animatic en tiempo real"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>Animatic</span>
+            </button>
             <button className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors" title="Colaboradores">
               <Users className="w-4 h-4 text-text-muted" />
             </button>
@@ -212,6 +225,15 @@ export function TopBar() {
 
       </div>
       <PremiumModal open={premiumOpen} onClose={() => setPremiumOpen(false)} currentToken={token} />
+      {isInProject && (
+        <AnimaticModal
+          open={animaticOpen}
+          onClose={() => setAnimaticOpen(false)}
+          projectId={projectId}
+          projectTitle={currentProject?.title}
+          scenes={scenes || []}
+        />
+      )}
     </header>
   );
 }
