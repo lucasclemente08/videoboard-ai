@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Search, X, Image, Film, Music, Camera, Loader2, Plus, Check, GripHorizontal, Play, Pause } from 'lucide-react';
 import { clsx } from 'clsx';
+import { mediaDragState } from '../../services/eventBus';
 
-const PEXELS_KEY = 'OC6zUhgrSOxHW2dM9TlHNp9wpQkusqQMoifWBXeZZSlYPdwe8g9Nr7ZM';
 
 interface PexelsMedia { id: number; width: number; height: number; url: string; photographer: string; src: { original: string; large: string; medium: string; small: string; tiny: string }; alt: string; }
 interface PexelsVideo { id: number; width: number; height: number; url: string; image: string; duration: number; user: { name: string }; video_files: { link: string; quality: string; width: number; height: number }[]; }
@@ -46,7 +46,7 @@ const TABS = [
   { id: 'uploads', icon: Camera, label: 'Subidos' },
 ];
 
-export function MediaLibrary({ onClose }: { onSelect?: (url: string) => void; onClose?: () => void }) {
+export function MediaLibrary({ onSelect, onClose }: { onSelect?: (url: string) => void; onClose?: () => void }) {
   const [tab, setTab] = useState('images');
   const [search, setSearch] = useState('');
   const [images, setImages] = useState<any[]>(DEMO_IMAGES);
@@ -64,14 +64,18 @@ export function MediaLibrary({ onClose }: { onSelect?: (url: string) => void; on
     }
     setLoading(true);
     try {
-      const endpoint = type === 'photo'
-        ? `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=20&orientation=landscape`
-        : `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=20&orientation=landscape`;
-      const resp = await fetch(endpoint, { headers: { Authorization: PEXELS_KEY } });
+      const token = localStorage.getItem('vb_token');
+      const endpoint = `/api/assets/pexels?query=${encodeURIComponent(query)}&type=${type}`;
+      const resp = await fetch(endpoint, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (resp.ok) {
-        const data = await resp.json();
-        if (type === 'photo') setImages(data.photos || DEMO_IMAGES);
-        else setVideos(data.videos || DEMO_VIDEOS);
+        const json = await resp.json();
+        const data = json.data;
+        if (data) {
+          if (type === 'photo') setImages(data.photos || DEMO_IMAGES);
+          else setVideos(data.videos || DEMO_VIDEOS);
+        }
       }
     } catch { /* keep demos */ }
     setLoading(false);
@@ -95,7 +99,7 @@ export function MediaLibrary({ onClose }: { onSelect?: (url: string) => void; on
     e.dataTransfer.setData('text/plain', json);
     e.dataTransfer.setData('application/json', json);
     e.dataTransfer.effectAllowed = 'copy';
-    (window as any).__draggedMedia = data;
+    mediaDragState.current = data;
   };
 
   const filteredMusic = music.filter(m => !musicSearch || m.name.toLowerCase().includes(musicSearch.toLowerCase()) || m.mood.toLowerCase().includes(musicSearch.toLowerCase()));
@@ -156,7 +160,10 @@ export function MediaLibrary({ onClose }: { onSelect?: (url: string) => void; on
                 {images.map((img: any) => (
                   <div key={img.id}
                     draggable onDragStart={(e: any) => handleDrag(e, img, 'image')}
-                    onClick={() => setSelected(selected === img.id ? null : img.id)}
+                    onClick={() => {
+                      setSelected(selected === img.id ? null : img.id);
+                      onSelect?.(img.src?.large || img.src?.medium);
+                    }}
                     className={clsx('relative group rounded-xl overflow-hidden border-2 transition-all bg-surface-raised cursor-grab active:cursor-grabbing hover:scale-[1.02] active:scale-[0.98]', selected === img.id ? 'border-accent-blue ring-2 ring-accent-blue/20' : 'border-transparent hover:border-surface-hover')}>
                     <div className="absolute top-1.5 left-1.5 z-10 p-0.5 rounded bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity"><GripHorizontal className="w-3 h-3 text-white/70" /></div>
                     <img src={img.src.medium} alt={img.alt} className="w-full aspect-video object-cover" loading="lazy" />

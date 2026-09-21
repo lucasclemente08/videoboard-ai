@@ -104,13 +104,13 @@ export function AttentionMap() {
                   />
                   {/* Risk indicator */}
                   {p.risk !== 'low' && (
-                    <g transform={`translate(${x + barWidth / 2}, ${scaleY(p.score) - 18})`}>
+                    <foreignObject x={x + barWidth / 2 - 6} y={scaleY(p.score) - 18} width={14} height={14}>
                       {p.risk === 'high' ? (
-                        <AlertTriangle className="w-3 h-3 text-accent-red" />
+                        <AlertTriangle className="w-3.5 h-3.5 text-accent-red" />
                       ) : (
-                        <AlertCircle className="w-3 h-3 text-accent-amber" />
+                        <AlertCircle className="w-3.5 h-3.5 text-accent-amber" />
                       )}
-                    </g>
+                    </foreignObject>
                   )}
                 </g>
               );

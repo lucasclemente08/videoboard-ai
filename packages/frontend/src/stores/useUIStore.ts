@@ -4,7 +4,7 @@ interface UIState {
   sidebarOpen: boolean;
   rightPanelOpen: boolean;
   rightPanelTab: string;
-  viewMode: 'canvas' | 'timeline' | 'calendar' | 'production' | 'kanban' | 'narrative' | 'emotion' | 'attention' | 'dashboard';
+  viewMode: 'canvas' | 'timeline' | 'calendar' | 'production' | 'checklist' | 'kanban' | 'narrative' | 'emotion' | 'attention' | 'dashboard';
 
   toggleSidebar: () => void;
   toggleRightPanel: () => void;

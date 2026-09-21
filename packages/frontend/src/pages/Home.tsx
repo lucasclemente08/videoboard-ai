@@ -1,56 +1,85 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Film, Plus, Search, Clock, Users, MoreHorizontal, Play } from 'lucide-react';
-import { clsx } from 'clsx';
-import { useProjects, useCreateProject } from '../api/hooks';
+import { Plus, Film, Clock, Trash2, FolderGit2 } from 'lucide-react';
+import { useProjects, useCreateProject, useDeleteProject } from '../api/hooks';
 import { useProjectStore } from '../stores/useProjectStore';
+import { useAuthStore } from '../stores/useAuthStore';
 import type { Project } from '@videoboard/shared';
+import { clsx } from 'clsx';
 
-export default function Home() {
+export function Home() {
   const navigate = useNavigate();
   const { data: projects, isLoading } = useProjects();
   const createProject = useCreateProject();
+  const deleteProject = useDeleteProject();
+  const { setCurrentProject } = useProjectStore();
+  const { user } = useAuthStore();
   const [showNewModal, setShowNewModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
-    const project = await createProject.mutateAsync({ title: newTitle });
-    setShowNewModal(false);
-    setNewTitle('');
-    navigate(`/project/${project.id}`);
+    try {
+      const project = await createProject.mutateAsync({ title: newTitle.trim() });
+      setCurrentProject(project);
+      setShowNewModal(false);
+      setNewTitle('');
+      navigate(`/project/${project.id}`);
+    } catch {
+      // Handled by react-query
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation();
+    if (window.confirm('¿Seguro que deseas eliminar este proyecto y todo su contenido?')) {
+      await deleteProject.mutateAsync(projectId);
+    }
   };
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-6xl mx-auto px-8 py-12">
+    <div className="flex-1 overflow-auto bg-surface p-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-10">
-          <h1 className="text-2xl font-bold text-text-primary mb-2">
-            Mis Proyectos
-          </h1>
-          <p className="text-text-secondary text-sm">
-            Organiza toda tu preproducción audiovisual en un solo lugar.
-          </p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-xl font-bold text-text-primary">
+              Bienvenido, {user?.full_name?.split(' ')[0] || 'Creador'}
+            </h1>
+            <p className="text-xs text-text-muted mt-0.5">Tus proyectos audiovisuales</p>
+          </div>
+          <button
+            onClick={() => setShowNewModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/90 transition-all shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo proyecto
+          </button>
         </div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Project Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {/* New Project Card */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowNewModal(true)}
-            className="aspect-[4/3] rounded-2xl border-2 border-dashed border-surface-edge hover:border-accent-blue/50 hover:bg-surface-hover/30 transition-all flex flex-col items-center justify-center gap-3 group"
+            className="aspect-[4/3] rounded-2xl border-2 border-dashed border-surface-edge hover:border-accent-blue/50 flex flex-col items-center justify-center gap-2 group transition-all"
           >
-            <div className="w-12 h-12 rounded-xl bg-accent-blue/10 flex items-center justify-center group-hover:bg-accent-blue/20 transition-colors">
-              <Plus className="w-6 h-6 text-accent-blue" />
+            <div className="w-10 h-10 rounded-xl bg-surface-raised group-hover:bg-accent-blue/10 flex items-center justify-center transition-colors">
+              <Plus className="w-5 h-5 text-text-muted group-hover:text-accent-blue transition-colors" />
             </div>
-            <span className="text-sm font-medium text-text-muted group-hover:text-accent-blue transition-colors">
+            <span className="text-xs font-medium text-text-muted group-hover:text-accent-blue transition-colors">
               Nuevo proyecto
             </span>
           </motion.button>
+
+          {/* Skeletons */}
+          {isLoading &&
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="aspect-[4/3] rounded-2xl bg-surface-raised animate-pulse border border-surface-edge" />
+            ))}
 
           {/* Project Cards */}
           {projects?.map((project) => (
@@ -58,15 +87,27 @@ export default function Home() {
               key={project.id}
               project={project}
               onClick={() => navigate(`/project/${project.id}`)}
+              onDelete={(e) => handleDelete(e, project.id)}
             />
           ))}
         </div>
 
-        {/* Loading skeletons */}
-        {isLoading &&
-          Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="aspect-[4/3] rounded-2xl bg-surface-raised animate-pulse" />
-          ))}
+        {/* Empty State when 0 projects and not loading */}
+        {!isLoading && (!projects || projects.length === 0) && (
+          <div className="mt-12 py-16 text-center border-2 border-dashed border-surface-edge rounded-3xl max-w-lg mx-auto p-8">
+            <FolderGit2 className="w-12 h-12 text-text-muted mx-auto mb-3 opacity-30" />
+            <h3 className="text-sm font-semibold text-text-primary">Comienza tu primer guion y storyboard</h3>
+            <p className="text-xs text-text-muted mt-1 mb-5">
+              Crea un proyecto para organizar escenas, tomas de cámara, elenco y sincronizar en tiempo real con tu equipo.
+            </p>
+            <button
+              onClick={() => setShowNewModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-accent-blue text-white text-xs font-semibold rounded-xl hover:bg-accent-blue/90 transition-all shadow-sm"
+            >
+              <Plus className="w-4 h-4" /> Crear mi primer proyecto
+            </button>
+          </div>
+        )}
       </div>
 
       {/* New Project Modal */}
@@ -87,29 +128,29 @@ export default function Home() {
               className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
             >
               <div className="pointer-events-auto w-full max-w-md bg-surface-raised border border-surface-edge rounded-2xl p-6 shadow-2xl">
-                <h2 className="text-lg font-semibold mb-4">Nuevo proyecto</h2>
+                <h2 className="text-base font-bold text-text-primary mb-4">Nuevo proyecto</h2>
                 <input
                   autoFocus
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                  placeholder="Título del proyecto"
-                  className="w-full px-4 py-2.5 bg-surface border border-surface-edge rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/20 transition-all mb-4"
+                  placeholder="Título del proyecto (ej: Cortometraje Eclipse)"
+                  className="w-full px-4 py-2.5 bg-surface border border-surface-edge rounded-xl text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue transition-all mb-5"
                 />
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => setShowNewModal(false)}
-                    className="px-4 py-2 rounded-xl text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-all"
+                    className="px-4 py-2 text-xs font-medium text-text-muted hover:text-text-primary transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleCreate}
-                    disabled={!newTitle.trim() || createProject.isPending}
-                    className="px-4 py-2 rounded-xl bg-accent-blue text-white text-sm font-medium hover:bg-accent-blue/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    disabled={!newTitle.trim()}
+                    className="px-4 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/90 transition-all disabled:opacity-50 shadow-sm"
                   >
-                    {createProject.isPending ? 'Creando...' : 'Crear'}
+                    Crear proyecto
                   </button>
                 </div>
               </div>
@@ -121,7 +162,15 @@ export default function Home() {
   );
 }
 
-function ProjectCard({ project, onClick }: { project: Project & { scene_count?: number; shot_count?: number }; onClick: () => void }) {
+function ProjectCard({
+  project,
+  onClick,
+  onDelete,
+}: {
+  project: Project & { scene_count?: number; shot_count?: number };
+  onClick: () => void;
+  onDelete: (e: React.MouseEvent) => void;
+}) {
   const statusLabels: Record<string, string> = {
     draft: 'Borrador',
     planning: 'Planificación',
@@ -141,11 +190,11 @@ function ProjectCard({ project, onClick }: { project: Project & { scene_count?: 
   };
 
   return (
-    <motion.button
+    <motion.div
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="aspect-[4/3] rounded-2xl bg-surface-raised border border-surface-edge hover:border-surface-hover overflow-hidden transition-all text-left group relative"
+      className="aspect-[4/3] rounded-2xl bg-surface-raised border border-surface-edge hover:border-surface-hover overflow-hidden transition-all text-left group relative cursor-pointer shadow-xs"
     >
       {/* Cover */}
       <div className="absolute inset-0 bg-gradient-to-br from-surface-hover to-surface opacity-50" />
@@ -159,12 +208,13 @@ function ProjectCard({ project, onClick }: { project: Project & { scene_count?: 
           <div className="w-8 h-8 rounded-lg bg-accent-blue/20 flex items-center justify-center">
             <Film className="w-4 h-4 text-accent-blue" />
           </div>
-          <span
-            onClick={(e) => { e.stopPropagation(); }}
-            className="p-1 rounded-lg hover:bg-surface-hover opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+          <button
+            onClick={onDelete}
+            className="p-1.5 rounded-lg hover:bg-surface-hover opacity-0 group-hover:opacity-100 transition-all text-text-muted hover:text-accent-red"
+            title="Eliminar proyecto"
           >
-            <MoreHorizontal className="w-4 h-4 text-text-muted" />
-          </span>
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
 
         <div>
@@ -178,16 +228,18 @@ function ProjectCard({ project, onClick }: { project: Project & { scene_count?: 
             </span>
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
-              {Math.round(project.estimated_duration_secs / 60)} min
+              {Math.round((project.estimated_duration_secs || 0) / 60)} min
             </span>
           </div>
 
           <div className="flex items-center gap-2 mt-2">
-            <span className={clsx('w-1.5 h-1.5 rounded-full', statusColors[project.status])} />
-            <span className="text-2xs text-text-secondary">{statusLabels[project.status]}</span>
+            <span className={clsx('w-1.5 h-1.5 rounded-full', statusColors[project.status || 'draft'])} />
+            <span className="text-2xs text-text-secondary">{statusLabels[project.status || 'draft']}</span>
           </div>
         </div>
       </div>
-    </motion.button>
+    </motion.div>
   );
 }
+
+export default Home;

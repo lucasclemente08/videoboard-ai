@@ -65,7 +65,11 @@ export function verifyToken(token: string): Record<string, any> | null {
       .replace(/\+/g, '-')
       .replace(/\//g, '_');
 
-    if (signatureB64 !== expectedSig) return null;
+    const sigBuf = Buffer.from(signatureB64);
+    const expBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return null;
+    }
 
     const payload = JSON.parse(fromBase64Url(payloadB64));
 

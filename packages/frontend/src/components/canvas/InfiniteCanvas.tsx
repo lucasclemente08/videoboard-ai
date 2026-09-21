@@ -9,7 +9,7 @@ import { SceneNode } from '../scene/SceneNode';
 import { StickyNode, ChecklistNode, CharacterNode, LocationNode, CameraNode, BudgetNode, RiskNode, FolderNode } from './nodes/ExtraNodes';
 import { useSceneStore } from '../../stores/useSceneStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
-import { useCreateScene, useCreateConnection, useDeleteConnection, useUpdateScene, useDeleteScene } from '../../api/hooks';
+import { useCreateScene, useCreateConnection, useDeleteConnection, useUpdateScene, useDeleteScene, useDuplicateScene } from '../../api/hooks';
 import { useUIStore } from '../../stores/useUIStore';
 import { CanvasToolbar } from './CanvasToolbar';
 import { ContextMenu, type ContextMenuState } from './ContextMenu';
@@ -18,6 +18,7 @@ import { NodeEditor } from './NodeEditor';
 import { LiveCursors } from '../collaboration/LiveCursors';
 import { useCollaboration } from '../../hooks/useCollaboration';
 import type { Scene, SceneConnection } from '@videoboard/shared';
+import { eventBus, AppEvents, mediaDragState } from '../../services/eventBus';
 
 const nodeTypes = { sceneNode: SceneNode, stickyNote: StickyNode, checklist: ChecklistNode, character: CharacterNode, location: LocationNode, camera: CameraNode, budget: BudgetNode, risk: RiskNode, folder: FolderNode };
 const edgeTypes = { connectionLine: ConnectionLine };
@@ -59,6 +60,7 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
   const deleteConnection = useDeleteConnection();
   const updateScene = useUpdateScene();
   const deleteScene = useDeleteScene();
+  const duplicateScene = useDuplicateScene();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -80,12 +82,41 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
     collaboration.emitCursor({ x, y });
   }, [collaboration]);
 
-  // Sync scenes/connections to nodes/edges
+  // Load custom nodes from localStorage on initial render
+  const initialCustomNodes = useRef<Node[]>([]);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`vb_custom_nodes_${projectId}`);
+      if (saved) {
+        initialCustomNodes.current = JSON.parse(saved);
+      }
+    } catch {}
+  }, [projectId]);
+
+  // Sync scenes/connections to nodes/edges without clobbering custom nodes
   useEffect(() => {
     const counts = new Map<string, number>();
-    connections.forEach(c => { counts.set(c.source_scene_id, (counts.get(c.source_scene_id) || 0) + 1); counts.set(c.target_scene_id, (counts.get(c.target_scene_id) || 0) + 1); });
-    setNodes(scenes.map(s => sceneToNode(s, counts.get(s.id) || 0)));
+    connections.forEach(c => {
+      counts.set(c.source_scene_id, (counts.get(c.source_scene_id) || 0) + 1);
+      counts.set(c.target_scene_id, (counts.get(c.target_scene_id) || 0) + 1);
+    });
+    setNodes((prevNodes) => {
+      const customNodes = prevNodes.filter(n => n.type !== 'sceneNode');
+      const activeCustom = customNodes.length > 0 ? customNodes : initialCustomNodes.current;
+      const sceneNodes = scenes.map(s => sceneToNode(s, counts.get(s.id) || 0));
+      return [...sceneNodes, ...activeCustom];
+    });
   }, [scenes, connections, setNodes]);
+
+  // Auto-persist custom nodes when modified
+  useEffect(() => {
+    const custom = nodes.filter(n => n.type !== 'sceneNode');
+    if (custom.length > 0) {
+      try {
+        localStorage.setItem(`vb_custom_nodes_${projectId}`, JSON.stringify(custom));
+      } catch {}
+    }
+  }, [nodes, projectId]);
 
   useEffect(() => { setEdges(connections.map(connectionToEdge)); }, [connections, setEdges]);
 
@@ -162,16 +193,18 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
     collaboration.emitSceneCreated(scene);
   }, [projectId, createScene, collaboration]);
 
-  // Register scene-drop handler + custom node adder
+  // Register scene-drop handler + custom node adder via eventBus
   useEffect(() => {
-    (window as any).__onSceneDrop = async (sceneId: string, media: any) => {
-      console.log('Dropped on scene', sceneId, media);
+    const unsubDrop = eventBus.on(AppEvents.SCENE_DROP, async ({ sceneId, media }: any) => {
       await updateScene.mutateAsync({ id: sceneId, description: media.url || media.thumb || '' });
-    };
-    (window as any).__addCustomNode = (_type: string, node: any) => {
+    });
+    const unsubNode = eventBus.on(AppEvents.ADD_CUSTOM_NODE, ({ node }: any) => {
       setNodes((nds) => [...nds, node]);
+    });
+    return () => {
+      unsubDrop();
+      unsubNode();
     };
-    return () => { delete (window as any).__onSceneDrop; delete (window as any).__addCustomNode; };
   }, [updateScene, setNodes]);
 
   // Delete via keyboard
@@ -262,13 +295,13 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
     setDragOver(false);
     const pos = { x: 200 + Math.random() * 300, y: 150 + Math.random() * 250 };
 
-    // Try global var first (most reliable), then dataTransfer
-    let media = (window as any).__draggedMedia;
+    // Try mediaDragState first, then dataTransfer
+    let media = mediaDragState.current;
     if (!media) {
       const raw = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('application/json');
       if (raw) { try { media = JSON.parse(raw); } catch {} }
     }
-    delete (window as any).__draggedMedia;
+    mediaDragState.current = null;
 
     if (media) {
       await createScene.mutateAsync({
@@ -337,61 +370,35 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
     return () => el.removeEventListener('mousemove', handler);
   }, [emitCursorThrottled]);
 
-  // Remote sync receivers
+  // Remote sync receivers via eventBus
   useEffect(() => {
-    (window as any).__remoteSceneAdd = (scene: Scene) => {
+    const unsub1 = eventBus.on(AppEvents.REMOTE_SCENE_ADD, (scene: Scene) => {
       useSceneStore.getState().addScene(scene);
-    };
-    (window as any).__remoteSceneUpdate = (scene: Scene) => {
+    });
+    const unsub2 = eventBus.on(AppEvents.REMOTE_SCENE_UPDATE, (scene: Scene) => {
       useSceneStore.getState().updateScene(scene.id, scene);
-    };
-    (window as any).__remoteSceneRemove = (sceneId: string) => {
+    });
+    const unsub3 = eventBus.on(AppEvents.REMOTE_SCENE_REMOVE, (sceneId: string) => {
       useSceneStore.getState().removeScene(sceneId);
-    };
-    (window as any).__remoteConnectionAdd = (conn: SceneConnection) => {
+    });
+    const unsub4 = eventBus.on(AppEvents.REMOTE_CONNECTION_ADD, (conn: SceneConnection) => {
       const current = useSceneStore.getState().connections;
       const exists = current.some(c => c.id === conn.id);
       if (!exists) useSceneStore.getState().setConnections([...current, conn]);
-    };
-    (window as any).__remoteConnectionRemove = (connectionId: string) => {
+    });
+    const unsub5 = eventBus.on(AppEvents.REMOTE_CONNECTION_REMOVE, (connectionId: string) => {
       const current = useSceneStore.getState().connections;
       useSceneStore.getState().setConnections(current.filter(c => c.id !== connectionId));
-    };
+    });
+
     return () => {
-      delete (window as any).__remoteSceneAdd;
-      delete (window as any).__remoteSceneUpdate;
-      delete (window as any).__remoteSceneRemove;
-      delete (window as any).__remoteConnectionAdd;
-      delete (window as any).__remoteConnectionRemove;
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+      unsub5();
     };
   }, []);
-
-  // Local emitters configuration
-  useEffect(() => {
-    (window as any).__emitSceneCreated = (scene: Scene) => {
-      collaboration.emitSceneCreated(scene);
-    };
-    (window as any).__emitSceneUpdate = (scene: Scene) => {
-      collaboration.emitSceneUpdate(scene);
-    };
-    (window as any).__emitSceneDeleted = (sceneId: string) => {
-      collaboration.emitSceneDeleted(sceneId);
-    };
-    (window as any).__emitConnectionCreated = (conn: SceneConnection) => {
-      collaboration.emitConnectionCreated(conn);
-    };
-    (window as any).__emitConnectionDeleted = (connId: string) => {
-      collaboration.emitConnectionDeleted(connId);
-    };
-
-    return () => {
-      delete (window as any).__emitSceneCreated;
-      delete (window as any).__emitSceneUpdate;
-      delete (window as any).__emitSceneDeleted;
-      delete (window as any).__emitConnectionCreated;
-      delete (window as any).__emitConnectionDeleted;
-    };
-  }, [collaboration]);
 
   const onEdgesDelete = useCallback(async (edgesToDelete: Edge[]) => {
     for (const edge of edgesToDelete) {
@@ -454,7 +461,18 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
         )}
 
         <CanvasToolbar onAddScene={addScene} />
-        {ctxMenu && <ContextMenu state={ctxMenu} onClose={() => setCtxMenu(null)} onAddScene={addScene} onDeleteNode={deleteNode} onEditNode={editNode} />}
+
+        {ctxMenu && (
+          <ContextMenu
+            state={ctxMenu}
+            onClose={() => setCtxMenu(null)}
+            onAddScene={addScene}
+            onDeleteNode={deleteNode}
+            onDuplicateNode={(id) => duplicateScene.mutate(id)}
+            onDeleteSelected={deleteSelected}
+            onEditNode={editNode}
+          />
+        )}
         {editor && (
           <NodeEditor
             nodeId={editor.id} nodeType={editor.type} data={editor.data}
@@ -462,7 +480,6 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
             onSave={saveNodeEdit} onClose={() => setEditor(null)}
           />
         )}
-        <LiveCursors cursors={cursors} />
       </div>
     </ReactFlowProvider>
   );

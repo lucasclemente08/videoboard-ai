@@ -7,6 +7,31 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth';
 export const assetsRouter = Router();
 assetsRouter.use(authMiddleware);
 
+// GET /api/assets/pexels?query=...&type=photo|video
+assetsRouter.get('/pexels', async (req: AuthRequest, res) => {
+  try {
+    const query = (req.query.query as string) || '';
+    const type = (req.query.type as string) || 'photo';
+    const apiKey = process.env.PEXELS_API_KEY || 'OC6zUhgrSOxHW2dM9TlHNp9wpQkusqQMoifWBXeZZSlYPdwe8g9Nr7ZM';
+
+    const endpoint = type === 'photo'
+      ? `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=20&orientation=landscape`
+      : `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=20&orientation=landscape`;
+
+    const resp = await fetch(endpoint, {
+      headers: { Authorization: apiKey },
+    });
+    if (!resp.ok) {
+      res.status(resp.status).json({ data: null, error: { code: 'PEXELS_ERROR', message: 'Error consultando Pexels' } });
+      return;
+    }
+    const data = await resp.json();
+    res.json({ data, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
 // GET /api/assets?project_id=...
 assetsRouter.get('/', async (req: AuthRequest, res) => {
   try {

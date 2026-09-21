@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { Project, Scene, Shot, SceneConnection, Character, Location, BudgetItem } from '@videoboard/shared';
+import { eventBus, AppEvents } from '../services/eventBus';
 
 // ---- Projects ----
 export function useProjects() {
@@ -27,6 +28,14 @@ export function useCreateProject() {
   });
 }
 
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/projects/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}
+
 // ---- Scenes ----
 export function useScenes(projectId: string) {
   return useQuery({
@@ -42,7 +51,7 @@ export function useCreateScene() {
     mutationFn: (data: Partial<Scene>) => api.post<Scene>('/scenes', data),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['scenes'] });
-      (window as any).__emitSceneCreated?.(data);
+      eventBus.emit(AppEvents.EMIT_SCENE_CREATED, data);
     },
   });
 }
@@ -54,7 +63,7 @@ export function useUpdateScene() {
       api.patch<Scene>(`/scenes/${id}`, data),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['scenes'] });
-      (window as any).__emitSceneUpdate?.(data);
+      eventBus.emit(AppEvents.EMIT_SCENE_UPDATE, data);
     },
   });
 }
@@ -65,7 +74,7 @@ export function useDeleteScene() {
     mutationFn: (id: string) => api.delete(`/scenes/${id}`),
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: ['scenes'] });
-      (window as any).__emitSceneDeleted?.(id);
+      eventBus.emit(AppEvents.EMIT_SCENE_DELETED, id);
     },
   });
 }
@@ -74,6 +83,14 @@ export function useDuplicateScene() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.post<Scene>(`/scenes/${id}/duplicate`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['scenes'] }),
+  });
+}
+
+export function useReorderScenes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (scene_ids: string[]) => api.post('/scenes/reorder', { scene_ids }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['scenes'] }),
   });
 }
@@ -94,7 +111,7 @@ export function useCreateConnection() {
       api.post<SceneConnection>('/scenes/connections', data),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['connections'] });
-      (window as any).__emitConnectionCreated?.(data);
+      eventBus.emit(AppEvents.EMIT_CONNECTION_CREATED, data);
     },
   });
 }
@@ -105,7 +122,7 @@ export function useDeleteConnection() {
     mutationFn: (id: string) => api.delete(`/scenes/connections/${id}`),
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: ['connections'] });
-      (window as any).__emitConnectionDeleted?.(id);
+      eventBus.emit(AppEvents.EMIT_CONNECTION_DELETED, id);
     },
   });
 }
@@ -161,6 +178,23 @@ export function useCreateCharacter() {
   });
 }
 
+export function useUpdateCharacter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Partial<Character>) =>
+      api.patch<Character>(`/characters/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['characters'] }),
+  });
+}
+
+export function useDeleteCharacter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/characters/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['characters'] }),
+  });
+}
+
 export function useLocations(projectId: string) {
   return useQuery({
     queryKey: ['locations', projectId],
@@ -173,6 +207,23 @@ export function useCreateLocation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Location>) => api.post<Location>('/characters/locations', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['locations'] }),
+  });
+}
+
+export function useUpdateLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Partial<Location>) =>
+      api.patch<Location>(`/characters/locations/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['locations'] }),
+  });
+}
+
+export function useDeleteLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/characters/locations/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations'] }),
   });
 }
@@ -191,6 +242,68 @@ export function useCreateBudgetItem() {
     mutationFn: ({ projectId, ...data }: { projectId: string } & Partial<BudgetItem>) =>
       api.post<BudgetItem>(`/projects/${projectId}/budget`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['budget'] }),
+  });
+}
+
+export function useUpdateBudgetItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, id, ...data }: { projectId: string; id: string } & Partial<BudgetItem>) =>
+      api.patch<BudgetItem>(`/projects/${projectId}/budget/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['budget'] }),
+  });
+}
+
+export function useDeleteBudgetItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, id }: { projectId: string; id: string }) =>
+      api.delete(`/projects/${projectId}/budget/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['budget'] }),
+  });
+}
+
+// ---- Production Checklist ----
+export interface ChecklistItem {
+  id: string;
+  project_id: string;
+  item: string;
+  category?: string;
+  checked: boolean;
+  notes?: string;
+  sort_order: number;
+}
+
+export function useChecklist(projectId: string) {
+  return useQuery({
+    queryKey: ['checklist', projectId],
+    queryFn: () => api.get<ChecklistItem[]>('/comments/checklist', { project_id: projectId }),
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateChecklistItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<ChecklistItem>) => api.post<ChecklistItem>('/comments/checklist', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['checklist'] }),
+  });
+}
+
+export function useUpdateChecklistItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Partial<ChecklistItem>) =>
+      api.patch<ChecklistItem>(`/comments/checklist/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['checklist'] }),
+  });
+}
+
+export function useDeleteChecklistItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/comments/checklist/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['checklist'] }),
   });
 }
 

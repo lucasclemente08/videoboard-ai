@@ -1,5 +1,3 @@
-const DEMO_TOKEN='***';
-
 const API_BASE = '/api';
 
 interface FetchOptions extends RequestInit {
@@ -15,7 +13,7 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
     url += `?${searchParams.toString()}`;
   }
 
-  const token = localStorage.getItem('vb_token') || DEMO_TOKEN;
+  const token = localStorage.getItem('vb_token');
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(fetchOptions.headers as Record<string, string>),

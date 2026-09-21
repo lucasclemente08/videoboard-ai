@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, X, Loader2, RefreshCw, Zap, Film, ClipboardList } from 'lucide-react';
 import { useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSceneStore } from '../../stores/useSceneStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 
@@ -16,6 +17,7 @@ export function AIPanel({ onClose }: { onClose: () => void }) {
   const { id: projectId } = useParams<{ id: string }>();
   const { selectedSceneId } = useSceneStore();
   const { token } = useAuthStore();
+  const queryClient = useQueryClient();
   const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,9 +51,11 @@ export function AIPanel({ onClose }: { onClose: () => void }) {
         });
         const json = await res.json();
         if (json.data) {
+          queryClient.invalidateQueries({ queryKey: ['scenes'] });
+          queryClient.invalidateQueries({ queryKey: ['connections'] });
           setMessages(prev => [...prev, {
             role: 'assistant',
-            content: `✅ ${json.data.message}\n\n${json.data.scenes.map((s: any, i: number) => `${i + 1}. **${s.title}** (${s.estimated_duration_secs}s) — ${s.scene_type || 'escena'}`).join('\n')}\n\n♻️ Recargá la página para ver las escenas en el canvas.`,
+            content: `✅ ${json.data.message}\n\n${json.data.scenes.map((s: any, i: number) => `${i + 1}. **${s.title}** (${s.estimated_duration_secs}s) — ${s.scene_type || 'escena'}`).join('\n')}\n\n✨ Las escenas se agregaron a tu canvas automáticamente.`,
             type: 'complete',
           }]);
         } else {

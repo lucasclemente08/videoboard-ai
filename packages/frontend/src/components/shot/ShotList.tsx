@@ -4,6 +4,7 @@ import { Plus, GripVertical, Camera, Clock, ChevronDown, ChevronRight, Trash2, I
 import { useShots, useCreateShot, useUpdateShot, useDeleteShot } from '../../api/hooks';
 import { clsx } from 'clsx';
 import type { Shot } from '@videoboard/shared';
+import { mediaDragState } from '../../services/eventBus';
 
 const shotTypeLabels: Record<string, string> = {
   close_up: 'Primer plano', medium_shot: 'Plano medio', american_shot: 'Plano americano',
@@ -38,8 +39,14 @@ function ShotDropZone({ shot, updateShot }: { shot: Shot; updateShot: any }) {
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); }, []);
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation(); setDragOver(false);
-    const media = (window as any).__draggedMedia;
-    delete (window as any).__draggedMedia;
+    let media = mediaDragState.current;
+    if (!media) {
+      try {
+        const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+        if (raw) media = JSON.parse(raw);
+      } catch { /* ignore */ }
+    }
+    mediaDragState.current = null;
     if (!media) return;
 
     const newItem = {

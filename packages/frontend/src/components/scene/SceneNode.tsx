@@ -6,6 +6,7 @@ import { useState, useCallback } from 'react';
 import type { Scene } from '@videoboard/shared';
 import { useUpdateScene } from '../../api/hooks';
 import { useZoomLevel } from '../../hooks/useZoomLevel';
+import { mediaDragState } from '../../services/eventBus';
 
 const priorityColors: Record<string, string> = {
   low: 'bg-text-muted', medium: 'bg-accent-blue', high: 'bg-accent-amber', critical: 'bg-accent-red',
@@ -37,8 +38,14 @@ export const SceneNode = memo(({ data, selected }: NodeProps) => {
   }, []);
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation(); setDragOver(false);
-    const media = (window as any).__draggedMedia;
-    delete (window as any).__draggedMedia;
+    let media = mediaDragState.current;
+    if (!media) {
+      try {
+        const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+        if (raw) media = JSON.parse(raw);
+      } catch { /* ignore */ }
+    }
+    mediaDragState.current = null;
     if (!media) return;
     // Update directly
     updateScene.mutate({ id: scene.id, description: media.url || media.thumb || '' });

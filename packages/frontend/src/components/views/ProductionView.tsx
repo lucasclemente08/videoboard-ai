@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -7,20 +7,16 @@ import {
   Camera, 
   Plus, 
   User, 
-  Sparkles, 
-  Check, 
-  X, 
+  Trash2, 
   Building, 
-  Film,
-  Layers,
-  FileText
+  Film
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useParams } from 'react-router-dom';
 import { 
-  useCharacters, useCreateCharacter,
-  useLocations, useCreateLocation,
-  useBudgetItems, useCreateBudgetItem
+  useCharacters, useCreateCharacter, useDeleteCharacter,
+  useLocations, useCreateLocation, useDeleteLocation,
+  useBudgetItems, useCreateBudgetItem, useDeleteBudgetItem
 } from '../../api/hooks';
 
 export function ProductionView() {
@@ -32,8 +28,36 @@ export function ProductionView() {
   const { data: budgetItems = [] } = useBudgetItems(projectId!);
 
   const createCharacter = useCreateCharacter();
+  const deleteCharacter = useDeleteCharacter();
+
   const createLocation = useCreateLocation();
+  const deleteLocation = useDeleteLocation();
+
   const createBudgetItem = useCreateBudgetItem();
+  const deleteBudgetItem = useDeleteBudgetItem();
+
+  // Custom equipment state persisted to localStorage
+  const [equipmentList, setEquipmentList] = useState<{ id: string; name: string; category: string }[]>([
+    { id: '1', name: 'Sony A7S III / FX3', category: 'Cámara Principal' },
+    { id: '2', name: '24-70mm f/2.8 GM II, 85mm f/1.4', category: 'Lentes' },
+    { id: '3', name: 'Sennheiser MKH416 + Rode Wireless GO II', category: 'Audio' },
+    { id: '4', name: 'Aputure 300d II + Amaran F22c', category: 'Iluminación' },
+  ]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    try {
+      const saved = localStorage.getItem(`vb_equipment_${projectId}`);
+      if (saved) setEquipmentList(JSON.parse(saved));
+    } catch {}
+  }, [projectId]);
+
+  const saveEquipment = (list: typeof equipmentList) => {
+    setEquipmentList(list);
+    try {
+      localStorage.setItem(`vb_equipment_${projectId}`, JSON.stringify(list));
+    } catch {}
+  };
 
   // Modals state
   const [showModal, setShowModal] = useState(false);
@@ -57,6 +81,9 @@ export function ProductionView() {
         estimated_cost: parseInt(cost, 10) || 0,
         actual_cost: parseInt(cost, 10) || 0 
       });
+    } else if (activeTab === 'equipment') {
+      const updated = [...equipmentList, { id: Date.now().toString(), name, category: category || 'General' }];
+      saveEquipment(updated);
     }
     setShowModal(false);
     setName('');
@@ -109,7 +136,7 @@ export function ProductionView() {
 
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent-blue text-white text-xs font-semibold hover:bg-accent-blue/90 transition-all shadow-sm"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-accent-blue text-white text-xs font-semibold hover:bg-accent-blue/90 transition-all shadow-sm"
         >
           <Plus className="w-4 h-4" />
           Añadir {activeTab === 'characters' ? 'Personaje' : activeTab === 'locations' ? 'Locación' : activeTab === 'budget' ? 'Gasto' : 'Equipo'}
@@ -133,7 +160,7 @@ export function ProductionView() {
                   key={char.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-4 rounded-2xl border border-surface-edge bg-surface-raised hover:border-surface-hover transition-all flex items-start gap-3 group"
+                  className="p-4 rounded-2xl border border-surface-edge bg-surface-raised hover:border-surface-hover transition-all flex items-start gap-3 group relative"
                 >
                   <div className="w-10 h-10 rounded-xl bg-accent-pink/15 flex items-center justify-center shrink-0">
                     <User className="w-5 h-5 text-accent-pink" />
@@ -143,6 +170,13 @@ export function ProductionView() {
                     <p className="text-2xs text-text-muted mt-0.5">Actor: {char.actor_name || 'Sin asignar'}</p>
                     {char.wardrobe && <p className="text-3xs text-text-secondary mt-1">Vestuario: {char.wardrobe}</p>}
                   </div>
+                  <button
+                    onClick={() => deleteCharacter.mutate(char.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-accent-red transition-all"
+                    title="Eliminar personaje"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </motion.div>
               ))}
 
@@ -169,7 +203,7 @@ export function ProductionView() {
                   key={loc.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-4 rounded-2xl border border-surface-edge bg-surface-raised hover:border-surface-hover transition-all flex items-start gap-3"
+                  className="p-4 rounded-2xl border border-surface-edge bg-surface-raised hover:border-surface-hover transition-all flex items-start gap-3 group relative"
                 >
                   <div className="w-10 h-10 rounded-xl bg-accent-green/15 flex items-center justify-center shrink-0">
                     <Building className="w-5 h-5 text-accent-green" />
@@ -181,6 +215,13 @@ export function ProductionView() {
                       {loc.permits_required ? 'Requiere Permiso' : 'Sin permiso req.'}
                     </span>
                   </div>
+                  <button
+                    onClick={() => deleteLocation.mutate(loc.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-accent-red transition-all"
+                    title="Eliminar locación"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </motion.div>
               ))}
 
@@ -210,7 +251,7 @@ export function ProductionView() {
 
             <div className="space-y-2">
               {budgetItems.map((item) => (
-                <div key={item.id} className="p-3.5 rounded-xl border border-surface-edge bg-surface-raised flex items-center justify-between">
+                <div key={item.id} className="p-3.5 rounded-xl border border-surface-edge bg-surface-raised flex items-center justify-between group">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-accent-orange/15 flex items-center justify-center">
                       <DollarSign className="w-4 h-4 text-accent-orange" />
@@ -220,7 +261,16 @@ export function ProductionView() {
                       <span className="text-4xs text-text-muted uppercase">{item.category}</span>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-text-primary">${(item.actual_cost || item.estimated_cost || 0).toLocaleString()}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-text-primary">${(item.actual_cost || item.estimated_cost || 0).toLocaleString()}</span>
+                    <button
+                      onClick={() => deleteBudgetItem.mutate({ projectId: projectId!, id: item.id })}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-accent-red transition-all"
+                      title="Eliminar ítem"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
 
@@ -238,26 +288,25 @@ export function ProductionView() {
           <div className="space-y-6">
             <div className="bg-surface-raised p-6 rounded-2xl border border-surface-edge">
               <h3 className="text-sm font-bold text-text-primary mb-4 flex items-center gap-2">
-                <Camera className="w-4 h-4 text-accent-cyan" /> Equipamiento Técnico Principal
+                <Camera className="w-4 h-4 text-accent-cyan" /> Equipamiento Técnico ({equipmentList.length})
               </h3>
 
               <div className="grid grid-cols-2 gap-4 text-xs">
-                <div className="p-3 rounded-xl bg-surface border border-surface-edge">
-                  <span className="text-4xs text-text-muted font-bold block uppercase">Cámara Principal</span>
-                  <span className="font-semibold text-text-primary">Sony A7S III / FX3</span>
-                </div>
-                <div className="p-3 rounded-xl bg-surface border border-surface-edge">
-                  <span className="text-4xs text-text-muted font-bold block uppercase">Lentes</span>
-                  <span className="font-semibold text-text-primary">24-70mm f/2.8 GM II, 85mm f/1.4</span>
-                </div>
-                <div className="p-3 rounded-xl bg-surface border border-surface-edge">
-                  <span className="text-4xs text-text-muted font-bold block uppercase">Audio</span>
-                  <span className="font-semibold text-text-primary">Sennheiser MKH410 + Rode Wireless GO II</span>
-                </div>
-                <div className="p-3 rounded-xl bg-surface border border-surface-edge">
-                  <span className="text-4xs text-text-muted font-bold block uppercase">Iluminación</span>
-                  <span className="font-semibold text-text-primary">Aputure 300d II + Amaran F22c</span>
-                </div>
+                {equipmentList.map((eq) => (
+                  <div key={eq.id} className="p-3.5 rounded-xl bg-surface border border-surface-edge flex items-center justify-between group">
+                    <div>
+                      <span className="text-4xs text-text-muted font-bold block uppercase">{eq.category}</span>
+                      <span className="font-semibold text-text-primary">{eq.name}</span>
+                    </div>
+                    <button
+                      onClick={() => saveEquipment(equipmentList.filter(item => item.id !== eq.id))}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-hover text-text-muted hover:text-accent-red transition-all"
+                      title="Eliminar equipo"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -281,13 +330,13 @@ export function ProductionView() {
             >
               <div className="pointer-events-auto w-full max-w-md bg-surface border border-surface-edge rounded-2xl p-6 shadow-2xl">
                 <h3 className="text-base font-bold mb-4">
-                  Nuevo {activeTab === 'characters' ? 'Personaje' : activeTab === 'locations' ? 'Locación' : 'Gasto'}
+                  Nuevo {activeTab === 'characters' ? 'Personaje' : activeTab === 'locations' ? 'Locación' : activeTab === 'budget' ? 'Gasto' : 'Equipo'}
                 </h3>
 
                 <div className="space-y-3 mb-6">
                   <input
                     type="text"
-                    placeholder={activeTab === 'characters' ? 'Nombre del personaje' : activeTab === 'locations' ? 'Nombre de la locación' : 'Descripción del gasto'}
+                    placeholder={activeTab === 'characters' ? 'Nombre del personaje' : activeTab === 'locations' ? 'Nombre de la locación' : activeTab === 'budget' ? 'Descripción del gasto' : 'Modelo / Nombre del equipo'}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-surface-edge bg-surface-raised text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue"
@@ -306,7 +355,7 @@ export function ProductionView() {
                   {activeTab === 'locations' && (
                     <input
                       type="text"
-                      placeholder="Dirección o mapa"
+                      placeholder="Dirección o set"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-surface-edge bg-surface-raised text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue"
@@ -319,6 +368,16 @@ export function ProductionView() {
                       placeholder="Costo Estimado ($)"
                       value={cost}
                       onChange={(e) => setCost(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-surface-edge bg-surface-raised text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue"
+                    />
+                  )}
+
+                  {activeTab === 'equipment' && (
+                    <input
+                      type="text"
+                      placeholder="Categoría (Cámara, Lentes, Audio, Iluminación...)"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-surface-edge bg-surface-raised text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue"
                     />
                   )}

@@ -24,11 +24,17 @@ export function TopBar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close user menu on click outside
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on click outside
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false);
+      }
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', h);
@@ -36,7 +42,7 @@ export function TopBar() {
   }, []);
 
   const viewLabels: Record<string, string> = {
-    canvas: 'Canvas', timeline: 'Timeline', calendar: 'Calendario',
+    canvas: 'Canvas', timeline: 'Timeline', calendar: 'Calendario', production: 'Producción', checklist: 'Checklist',
     kanban: 'Kanban', narrative: 'Narrativa', emotion: 'Emoción', attention: 'Atención', dashboard: 'Dashboard',
   };
 
@@ -47,10 +53,11 @@ export function TopBar() {
     });
   };
 
-  const handleExport = () => {
+  const handleExport = (format: 'pdf' | 'csv' | 'json' = 'pdf') => {
     const projectId = location.pathname.split('/')[2];
     if (projectId) {
-      window.open(`http://localhost:3001/api/export/json?project_id=${projectId}`, '_blank');
+      setExportMenuOpen(false);
+      window.open(`/api/export/${format}?project_id=${projectId}`, '_blank');
     }
   };
 
@@ -89,13 +96,37 @@ export function TopBar() {
             <button className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors" title="Historial">
               <History className="w-4 h-4 text-text-muted" />
             </button>
-            <button
-              onClick={handleExport}
-              className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors"
-              title="Exportar"
-            >
-              <Download className="w-4 h-4 text-text-muted" />
-            </button>
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors"
+                title="Exportar proyecto"
+              >
+                <Download className="w-4 h-4 text-text-muted" />
+              </button>
+              {exportMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-48 bg-surface-raised border border-surface-edge rounded-xl shadow-xl py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    className="w-full text-left px-3.5 py-2 hover:bg-surface-hover transition-colors flex items-center gap-2 text-text-primary"
+                  >
+                    <span>📄</span> Dossier PDF / Imprimir
+                  </button>
+                  <button
+                    onClick={() => handleExport('csv')}
+                    className="w-full text-left px-3.5 py-2 hover:bg-surface-hover transition-colors flex items-center gap-2 text-text-primary"
+                  >
+                    <span>📊</span> Planilla CSV (Excel)
+                  </button>
+                  <button
+                    onClick={() => handleExport('json')}
+                    className="w-full text-left px-3.5 py-2 hover:bg-surface-hover transition-colors flex items-center gap-2 text-text-primary"
+                  >
+                    <span>📦</span> Copia JSON
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="h-5 w-px bg-surface-edge mx-1" />
             <button
               onClick={handleShare}

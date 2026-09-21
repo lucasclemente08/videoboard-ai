@@ -3,6 +3,7 @@ import { useReactFlow } from 'reactflow';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useState, useCallback } from 'react';
 import { clsx } from 'clsx';
+import { eventBus, AppEvents } from '../../services/eventBus';
 
 interface Props {
   onAddScene: (x: number, y: number) => void;
@@ -67,7 +68,7 @@ export function CanvasToolbar({ onAddScene }: Props) {
           ...(nt.type === 'camera' ? { camera: '', lens: '', fps: 24 } : {}),
         },
       };
-      (window as any).__addCustomNode?.(nt.type, node);
+      eventBus.emit(AppEvents.ADD_CUSTOM_NODE, { type: nt.type, node });
     }
     setShowNodes(false);
   }, [getViewportCenter, onAddScene]);

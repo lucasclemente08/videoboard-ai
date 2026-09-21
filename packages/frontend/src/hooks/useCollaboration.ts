@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useAuthStore } from '../stores/useAuthStore';
+import { eventBus, AppEvents } from '../services/eventBus';
 
 interface CursorData {
   userId: string;
@@ -12,10 +14,12 @@ interface PresenceUser {
   id: string;
   name: string;
   color: string;
-  cursor: { x: number; y: number } | null;
+  cursor: CursorPosition | null;
 }
 
-const SOCKET_URL = 'http://localhost:3001';
+type CursorPosition = { x: number; y: number };
+
+const SOCKET_URL = import.meta.env.VITE_WS_URL || (typeof window !== 'undefined' ? `${window.location.protocol === 'https:' ? 'https:' : 'http:'}//${window.location.hostname}:3001` : 'http://localhost:3001');
 
 export function useCollaboration(projectId: string | undefined) {
   const socketRef = useRef<Socket | null>(null);
@@ -26,12 +30,18 @@ export function useCollaboration(projectId: string | undefined) {
   useEffect(() => {
     if (!projectId) return;
 
-    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    const token = localStorage.getItem('vb_token');
+    const { user } = useAuthStore.getState();
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      auth: { token },
+    });
     socketRef.current = socket;
 
     socket.on('connect', () => {
       setConnected(true);
-      socket.emit('join-room', { projectId, userName: `User-${socket.id?.slice(0, 4)}` });
+      const userName = user?.full_name || user?.email || `User-${socket.id?.slice(0, 4)}`;
+      socket.emit('join-room', { projectId, userName });
     });
 
     socket.on('disconnect', () => setConnected(false));
@@ -54,26 +64,48 @@ export function useCollaboration(projectId: string | undefined) {
 
     // Scene sync handlers
     socket.on('scene-changed', ({ scene }: { scene: any }) => {
-      (window as any).__remoteSceneUpdate?.(scene);
+      eventBus.emit(AppEvents.REMOTE_SCENE_UPDATE, scene);
     });
 
     socket.on('scene-added', ({ scene }: { scene: any }) => {
-      (window as any).__remoteSceneAdd?.(scene);
+      eventBus.emit(AppEvents.REMOTE_SCENE_ADD, scene);
     });
 
     socket.on('scene-removed', ({ sceneId }: { sceneId: string }) => {
-      (window as any).__remoteSceneRemove?.(sceneId);
+      eventBus.emit(AppEvents.REMOTE_SCENE_REMOVE, sceneId);
     });
 
     socket.on('connection-added', ({ connection }: { connection: any }) => {
-      (window as any).__remoteConnectionAdd?.(connection);
+      eventBus.emit(AppEvents.REMOTE_CONNECTION_ADD, connection);
     });
 
     socket.on('connection-removed', ({ connectionId }: { connectionId: string }) => {
-      (window as any).__remoteConnectionRemove?.(connectionId);
+      eventBus.emit(AppEvents.REMOTE_CONNECTION_REMOVE, connectionId);
+    });
+
+    // Listen to local mutations to broadcast over socket
+    const unsub1 = eventBus.on(AppEvents.EMIT_SCENE_CREATED, (scene) => {
+      socket.emit('scene-created', { projectId, scene });
+    });
+    const unsub2 = eventBus.on(AppEvents.EMIT_SCENE_UPDATE, (scene) => {
+      socket.emit('scene-update', { projectId, scene });
+    });
+    const unsub3 = eventBus.on(AppEvents.EMIT_SCENE_DELETED, (sceneId) => {
+      socket.emit('scene-deleted', { projectId, sceneId });
+    });
+    const unsub4 = eventBus.on(AppEvents.EMIT_CONNECTION_CREATED, (connection) => {
+      socket.emit('connection-created', { projectId, connection });
+    });
+    const unsub5 = eventBus.on(AppEvents.EMIT_CONNECTION_DELETED, (connectionId) => {
+      socket.emit('connection-deleted', { projectId, connectionId });
     });
 
     return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+      unsub5();
       socket.disconnect();
       socketRef.current = null;
     };

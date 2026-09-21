@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { authMiddleware, premiumMiddleware, type AuthRequest } from '../middleware/auth';
 import { db, eq } from '../config/database';
+import { premiumSubscriptions } from '../db/schema/premium';
 import { signToken } from '../services/jwt';
+import crypto from 'crypto';
 
 export const premiumRouter = Router();
 premiumRouter.use(authMiddleware);
@@ -11,17 +13,19 @@ premiumRouter.get('/status', async (req: AuthRequest, res) => {
   try {
     let subscription = null;
     try {
-      const rows = await db.select().from('premium_subscriptions').where(eq('user_id' as any, req.userId));
+      const rows = await db.select().from(premiumSubscriptions).where(eq(premiumSubscriptions.user_id, req.userId!));
       subscription = rows[0] || null;
     } catch {
       // Table might not exist yet
     }
 
+    const isActive = !!subscription && subscription.status === 'active';
+
     res.json({
       data: {
-        isPremium: !!subscription && (subscription as any).status === 'active',
+        isPremium: isActive,
         subscription,
-        features: subscription && (subscription as any).status === 'active' ? {
+        features: isActive ? {
           aiGenerations: true,
           unlimitedExports: true,
           advancedCollaboration: true,
@@ -42,31 +46,39 @@ premiumRouter.get('/status', async (req: AuthRequest, res) => {
   }
 });
 
-// POST /api/premium/activate — Activar premium (simulado, sin pasarela de pago real)
+// POST /api/premium/activate — Activar premium (simulado)
 premiumRouter.post('/activate', async (req: AuthRequest, res) => {
   try {
-    const subscription = {
-      id: crypto.randomUUID(),
-      user_id: req.userId,
-      plan: 'premium',
-      status: 'active',
-      started_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 365 * 86400 * 1000).toISOString(), // 1 year
-      payment_method: req.body.payment_method || 'simulated',
-      amount: req.body.amount || 999, // $9.99
-      currency: 'USD',
-    };
+    const expiresAt = new Date(Date.now() + 365 * 86400 * 1000);
+    let subscriptionRecord: any = null;
 
-    // Store in the in-memory DB
-    const table = (global as any).__videoboard_tables?.premium_subscriptions || [];
-    table.push(subscription);
-    if (!(global as any).__videoboard_tables) (global as any).__videoboard_tables = {};
-    (global as any).__videoboard_tables.premium_subscriptions = table;
-
-    // Also try the memdb
     try {
-      await db.insert('premium_subscriptions' as any).values(subscription);
-    } catch { /* memdb insert */ }
+      const existing = await db.select().from(premiumSubscriptions).where(eq(premiumSubscriptions.user_id, req.userId!));
+      if (existing.length > 0) {
+        const [updated] = await db.update(premiumSubscriptions)
+          .set({ status: 'active', expires_at: expiresAt })
+          .where(eq(premiumSubscriptions.user_id, req.userId!))
+          .returning();
+        subscriptionRecord = updated;
+      } else {
+        const [inserted] = await db.insert(premiumSubscriptions).values({
+          id: crypto.randomUUID(),
+          user_id: req.userId!,
+          plan: 'pro',
+          status: 'active',
+          expires_at: expiresAt,
+        }).returning();
+        subscriptionRecord = inserted;
+      }
+    } catch {
+      subscriptionRecord = {
+        id: crypto.randomUUID(),
+        user_id: req.userId,
+        plan: 'pro',
+        status: 'active',
+        expires_at: expiresAt,
+      };
+    }
 
     // Generate a new token with premium claim
     const newToken = signToken({
@@ -77,7 +89,7 @@ premiumRouter.post('/activate', async (req: AuthRequest, res) => {
 
     res.json({
       data: {
-        subscription,
+        subscription: subscriptionRecord,
         token: newToken,
         message: '¡Bienvenido a VideoBoard Premium! Todas las funciones IA están desbloqueadas.',
       },
@@ -91,17 +103,17 @@ premiumRouter.post('/activate', async (req: AuthRequest, res) => {
 // POST /api/premium/cancel — Cancelar suscripción
 premiumRouter.post('/cancel', async (req: AuthRequest, res) => {
   try {
-    // Try to update in memdb
     try {
-      await db.update('premium_subscriptions' as any)
-        .set({ status: 'cancelled', cancelled_at: new Date().toISOString() })
-        .where(eq('user_id' as any, req.userId));
+      await db.update(premiumSubscriptions)
+        .set({ status: 'cancelled' })
+        .where(eq(premiumSubscriptions.user_id, req.userId!));
     } catch { /* ignore */ }
 
     // Generate new token without premium
     const newToken = signToken({
       sub: req.userId,
       email: req.userEmail,
+      isPremium: false,
     });
 
     res.json({

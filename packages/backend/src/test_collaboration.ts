@@ -1,11 +1,20 @@
+import http from 'http';
+import { createApp } from './app';
+import { createCollaborationServer } from './services/collaboration';
 import { io } from 'socket.io-client';
 
-const URL = 'http://localhost:3001';
+const PORT = 3099;
+const URL = `http://localhost:${PORT}`;
 const ROOM_ID = 'test-collab-room-2026';
 
-console.log('🚀 Starting Real-Time Collaboration Test Script...');
+console.log('🚀 Starting Self-Contained Real-Time Collaboration Test Script...');
 
-async function run() {
+const app = createApp();
+const server = http.createServer(app);
+createCollaborationServer(server);
+
+server.listen(PORT, async () => {
+  console.log(`📡 Test Server listening on ${URL}`);
   const clientA = io(URL, { transports: ['websocket'] });
   const clientB = io(URL, { transports: ['websocket'] });
 
@@ -23,27 +32,23 @@ async function run() {
     clientB.emit('join-room', { projectId: ROOM_ID, userName: 'User Bob' });
   });
 
-  // Client A listens for presence updates
   clientA.on('presence-update', (presence) => {
     presenceUpdateCount++;
-    console.log(`👥 Client A received presence-update (total users in room: ${presence.length}):`, 
+    console.log(`👥 Client A received presence-update (${presence.length} users):`, 
       presence.map((u: any) => u.name).join(', ')
     );
   });
 
-  // Client B listens for cursor updates from Client A
   clientB.on('cursor-update', (data) => {
     cursorUpdateCount++;
-    console.log(`🖱️ Client B received cursor-update from ${data.name || data.userId}:`, data.position);
+    console.log(`🖱️ Client B received cursor-update:`, data.position);
   });
 
-  // Client B listens for scene updates from Client A
   clientB.on('scene-changed', (data) => {
     sceneUpdateCount++;
-    console.log(`🎬 Client B received scene-changed from user ${data.userId}:`, data.scene);
+    console.log(`🎬 Client B received scene-changed:`, data.scene);
   });
 
-  // Let's perform actions after a short delay
   setTimeout(() => {
     console.log('✍️ Client A moving cursor...');
     clientA.emit('cursor-move', { projectId: ROOM_ID, position: { x: 150, y: 350 } });
@@ -54,24 +59,22 @@ async function run() {
     clientA.emit('scene-update', { projectId: ROOM_ID, scene: { id: 'scene-1', title: 'Escena 1 (Editada por Alice)', position_x: 200 } });
   }, 2000);
 
-  // Stop after testing
   setTimeout(() => {
     console.log('\n--- Test results verification ---');
-    console.log(`Presence updates received: ${presenceUpdateCount}`);
-    console.log(`Cursor updates received: ${cursorUpdateCount}`);
-    console.log(`Scene updates received: ${sceneUpdateCount}`);
+    console.log(`Presence updates: ${presenceUpdateCount}`);
+    console.log(`Cursor updates: ${cursorUpdateCount}`);
+    console.log(`Scene updates: ${sceneUpdateCount}`);
 
-    if (presenceUpdateCount >= 2 && cursorUpdateCount >= 1 && sceneUpdateCount >= 1) {
-      console.log('\n✅ ALL COLLABORATION REAL-TIME TESTS PASSED SUCCESSFULLY!');
-      process.exit(0);
-    } else {
-      console.error('\n❌ SOME REAL-TIME COLLABORATION MESSAGES WERE MISSING!');
-      process.exit(1);
-    }
-  }, 4000);
-}
-
-run().catch((err) => {
-  console.error('Fatal test error:', err);
-  process.exit(1);
+    clientA.disconnect();
+    clientB.disconnect();
+    server.close(() => {
+      if (presenceUpdateCount >= 2 && cursorUpdateCount >= 1 && sceneUpdateCount >= 1) {
+        console.log('\n✅ ALL COLLABORATION REAL-TIME TESTS PASSED SUCCESSFULLY!');
+        process.exit(0);
+      } else {
+        console.error('\n❌ SOME REAL-TIME COLLABORATION MESSAGES WERE MISSING!');
+        process.exit(1);
+      }
+    });
+  }, 3500);
 });

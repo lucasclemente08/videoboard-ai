@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { eq, desc } from '../config/database';
 import { db } from '../config/database';
-import { comments, versions, templates } from '../db/schema/comments';
+import { comments, versions, templates, productionChecklist } from '../db/schema/comments';
 import { authMiddleware, type AuthRequest } from '../middleware/auth';
 
 export const commentsRouter = Router();
@@ -123,3 +123,58 @@ commentsRouter.post('/templates', async (req: AuthRequest, res) => {
     res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
   }
 });
+
+// ---- Production Checklist ----
+commentsRouter.get('/checklist', async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.query.project_id as string;
+    if (!projectId) {
+      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'project_id requerido' } });
+      return;
+    }
+    const rows = await db.select().from(productionChecklist)
+      .where(eq(productionChecklist.project_id, projectId))
+      .orderBy(productionChecklist.sort_order);
+    res.json({ data: rows, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
+commentsRouter.post('/checklist', async (req: AuthRequest, res) => {
+  try {
+    const [item] = await db.insert(productionChecklist).values({
+      project_id: req.body.project_id,
+      item: req.body.item,
+      category: req.body.category || 'General',
+      checked: req.body.checked || false,
+      notes: req.body.notes || null,
+      sort_order: req.body.sort_order || 0,
+    }).returning();
+    res.status(201).json({ data: item, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
+commentsRouter.patch('/checklist/:id', async (req: AuthRequest, res) => {
+  try {
+    const [updated] = await db.update(productionChecklist)
+      .set(req.body)
+      .where(eq(productionChecklist.id, req.params.id))
+      .returning();
+    res.json({ data: updated, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
+commentsRouter.delete('/checklist/:id', async (req: AuthRequest, res) => {
+  try {
+    await db.delete(productionChecklist).where(eq(productionChecklist.id, req.params.id));
+    res.json({ data: { deleted: true }, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+

@@ -13,6 +13,7 @@ import { KanbanView } from '../components/views/KanbanView';
 import { Dashboard } from '../components/views/Dashboard';
 import { CalendarView } from '../components/views/CalendarView';
 import { ProductionView } from '../components/views/ProductionView';
+import { ChecklistView } from '../components/views/ChecklistView';
 import { AIPanel } from '../components/ai/AIPanel';
 import { useAIStore } from '../stores/useAIStore';
 import { AnimatePresence } from 'framer-motion';
@@ -50,6 +51,8 @@ export function ProjectView() {
         return <CalendarView />;
       case 'production':
         return <ProductionView />;
+      case 'checklist':
+        return <ChecklistView />;
       case 'narrative':
         return <NarrativeView />;
       case 'emotion':

@@ -4,6 +4,8 @@ import { getProvider, autoRegisterProviders } from '../services/ai-providers';
 import { authMiddleware, premiumMiddleware, type AuthRequest } from '../middleware/auth';
 import { db, eq } from '../config/database';
 import { scenes, sceneConnections } from '../db/schema/scenes';
+import { projects } from '../db/schema/projects';
+import { shots } from '../db/schema/shots';
 
 export const aiRouter = Router();
 
@@ -38,8 +40,8 @@ aiRouter.post('/chat', async (req: AuthRequest, res) => {
       return;
     }
 
-    // Build project context safely using our simplDB API
-    const projectRows = await db.select().from('projects').where(eq('id' as any, projectId));
+    // Build project context safely
+    const projectRows = await db.select().from(projects).where(eq(projects.id, projectId));
     const project = projectRows?.[0];
 
     const scenesRows = await db.select().from(scenes).where(eq(scenes.project_id, projectId));
@@ -49,7 +51,7 @@ aiRouter.post('/chat', async (req: AuthRequest, res) => {
     let selectedShots: any[] = [];
     if (sceneId) {
       try {
-        selectedShots = await db.select().from('shots').where(eq('scene_id' as any, sceneId)) || [];
+        selectedShots = await db.select().from(shots).where(eq(shots.scene_id, sceneId)) || [];
       } catch {
         selectedShots = [];
       }

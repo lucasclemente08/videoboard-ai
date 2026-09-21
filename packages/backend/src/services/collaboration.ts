@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
+import { verifyToken } from './jwt';
 
 interface CursorPosition {
   x: number;
@@ -20,6 +21,20 @@ export function createCollaborationServer(httpServer: HttpServer) {
   const io = new Server(httpServer, {
     cors: { origin: '*', methods: ['GET', 'POST'] },
     pingTimeout: 60000,
+  });
+
+  // Verify handshake auth
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
+    if (token && token !== 'demo-token') {
+      const payload = verifyToken(token);
+      if (payload) {
+        socket.data.userId = payload.sub;
+        socket.data.userEmail = payload.email;
+        socket.data.userName = payload.name;
+      }
+    }
+    next();
   });
 
   // Store presence per room

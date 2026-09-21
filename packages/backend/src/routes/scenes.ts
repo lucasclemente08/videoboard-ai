@@ -24,6 +24,66 @@ scenesRouter.get('/', async (req: AuthRequest, res) => {
   }
 });
 
+// ---- Connections (MUST be declared before /:id to avoid route collision) ----
+// GET /api/scenes/connections?project_id=...
+scenesRouter.get('/connections', async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.query.project_id as string;
+    if (!projectId) {
+      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'project_id es requerido' } });
+      return;
+    }
+    const rows = await db.select().from(sceneConnections).where(eq(sceneConnections.project_id, projectId));
+    res.json({ data: rows, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
+// POST /api/scenes/connections
+scenesRouter.post('/connections', async (req: AuthRequest, res) => {
+  try {
+    const [conn] = await db.insert(sceneConnections).values({
+      project_id: req.body.project_id,
+      source_scene_id: req.body.source_scene_id,
+      target_scene_id: req.body.target_scene_id,
+      connection_type: req.body.connection_type || 'sequence',
+      label: req.body.label || null,
+      transition_type: req.body.transition_type || null,
+    }).returning();
+    res.status(201).json({ data: conn, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
+// DELETE /api/scenes/connections/:id
+scenesRouter.delete('/connections/:id', async (req: AuthRequest, res) => {
+  try {
+    await db.delete(sceneConnections).where(eq(sceneConnections.id, req.params.id));
+    res.json({ data: { deleted: true }, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
+// POST /api/scenes/reorder
+scenesRouter.post('/reorder', async (req: AuthRequest, res) => {
+  try {
+    const { scene_ids } = req.body;
+    if (!Array.isArray(scene_ids)) {
+      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'scene_ids debe ser un array' } });
+      return;
+    }
+    for (let i = 0; i < scene_ids.length; i++) {
+      await db.update(scenes).set({ sort_order: i }).where(eq(scenes.id, scene_ids[i]));
+    }
+    res.json({ data: { reordered: true }, error: null });
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
 // GET /api/scenes/:id
 scenesRouter.get('/:id', async (req: AuthRequest, res) => {
   try {
@@ -100,46 +160,6 @@ scenesRouter.post('/:id/duplicate', async (req: AuthRequest, res) => {
       position_y: (rest.position_y || 0) + 50,
     }).returning();
     res.status(201).json({ data: duplicate, error: null });
-  } catch (err) {
-    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
-  }
-});
-
-// ---- Connections ----
-scenesRouter.get('/connections', async (req: AuthRequest, res) => {
-  try {
-    const projectId = req.query.project_id as string;
-    if (!projectId) {
-      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'project_id es requerido' } });
-      return;
-    }
-    const rows = await db.select().from(sceneConnections).where(eq(sceneConnections.project_id, projectId));
-    res.json({ data: rows, error: null });
-  } catch (err) {
-    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
-  }
-});
-
-scenesRouter.post('/connections', async (req: AuthRequest, res) => {
-  try {
-    const [conn] = await db.insert(sceneConnections).values({
-      project_id: req.body.project_id,
-      source_scene_id: req.body.source_scene_id,
-      target_scene_id: req.body.target_scene_id,
-      connection_type: req.body.connection_type || 'sequence',
-      label: req.body.label || null,
-      transition_type: req.body.transition_type || null,
-    }).returning();
-    res.status(201).json({ data: conn, error: null });
-  } catch (err) {
-    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
-  }
-});
-
-scenesRouter.delete('/connections/:id', async (req: AuthRequest, res) => {
-  try {
-    await db.delete(sceneConnections).where(eq(sceneConnections.id, req.params.id));
-    res.json({ data: { deleted: true }, error: null });
   } catch (err) {
     res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
   }

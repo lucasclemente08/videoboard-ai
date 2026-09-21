@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { signToken, verifyToken } from '../services/jwt';
 import { db, eq } from '../config/database';
 import { users } from '../db/schema/users';
+import { premiumSubscriptions } from '../db/schema/premium';
 import * as crypto from 'crypto';
 
 export interface AuthRequest extends Request {
@@ -81,7 +82,7 @@ export async function premiumMiddleware(req: AuthRequest, res: Response, next: N
 
   // Check DB (slow path — for tokens generated before premium upgrade)
   try {
-    const subscriptions = await db.select().from('premium_subscriptions').where(eq('user_id' as any, req.userId));
+    const subscriptions = await db.select().from(premiumSubscriptions).where(eq(premiumSubscriptions.user_id, req.userId!));
     if (subscriptions.length > 0) {
       const sub = subscriptions[0];
       if (sub.status === 'active' && (!sub.expires_at || new Date(sub.expires_at) > new Date())) {

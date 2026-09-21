@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Film, Layout, Calendar, Columns, Sparkles, Library, Settings, ChevronLeft, Plus, Home, BarChart3, Heart, Activity, LogOut, User, Crown, Clapperboard } from 'lucide-react';
+import { Film, Layout, Calendar, Columns, Sparkles, Library, Settings, ChevronLeft, Plus, Home, BarChart3, Heart, Activity, LogOut, User, Crown, Clapperboard, ListChecks } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -76,6 +76,7 @@ export function Sidebar() {
               { icon: Film, label: 'Timeline', view: 'timeline' as const },
               { icon: Calendar, label: 'Calendario', view: 'calendar' as const },
               { icon: Clapperboard, label: 'Producción', view: 'production' as const },
+              { icon: ListChecks, label: 'Checklist', view: 'checklist' as const },
               { icon: Columns, label: 'Kanban', view: 'kanban' as const },
               { icon: Sparkles, label: 'Narrativa', view: 'narrative' as const },
               { icon: Heart, label: 'Emociones', view: 'emotion' as const },

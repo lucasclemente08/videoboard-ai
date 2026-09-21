@@ -6,3 +6,4 @@ export { assets } from './assets';
 export { characters, locations, equipment } from './characters';
 export { music } from './music';
 export { comments, versions, templates, productionChecklist, budgetItems } from './comments';
+export { premiumSubscriptions } from './premium';
