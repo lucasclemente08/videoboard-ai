@@ -403,6 +403,7 @@ export function ClientShareView() {
           open={animaticOpen}
           onClose={() => setAnimaticOpen(false)}
           projectId={project.id}
+          project={project}
           projectTitle={project.title}
           scenes={scenes}
         />

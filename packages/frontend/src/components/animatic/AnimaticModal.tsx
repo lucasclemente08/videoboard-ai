@@ -4,22 +4,28 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
   Maximize2, Minimize2, X, Repeat, Settings, Sliders,
-  Film, Clock, Layers, Sparkles, Camera, Sun, HelpCircle
+  Film, Clock, Layers, Sparkles, Camera, Sun, HelpCircle,
+  BookOpen, Music, Users, Clapperboard, Tag, Compass,
+  ChevronRight, Volume1
 } from 'lucide-react';
-import type { Scene, Shot } from '@videoboard/shared';
+import type { Scene, Shot, Project } from '@videoboard/shared';
 import { useAuthStore } from '../../stores/useAuthStore';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   projectId: string;
+  project?: Project | null;
   projectTitle?: string;
   scenes: Scene[];
+  initialSceneId?: string | null;
 }
 
-export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }: Props) {
+export function AnimaticModal({ open, onClose, projectId, project, projectTitle, scenes, initialSceneId }: Props) {
   const { token } = useAuthStore();
   const [shots, setShots] = useState<Shot[]>([]);
+  const [characters, setCharacters] = useState<any[]>([]);
+  const [musicTracks, setMusicTracks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0); // in seconds
@@ -28,22 +34,30 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
   const [loop, setLoop] = useState(false);
   const [voiceoverEnabled, setVoiceoverEnabled] = useState(true);
   const [showTechnicalHUD, setShowTechnicalHUD] = useState(true);
+  const [showContextDrawer, setShowContextDrawer] = useState(false);
+  const [showIntroSlate, setShowIntroSlate] = useState(false);
+  const [musicEnabled, setMusicEnabled] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.35);
   const [kenBurns, setKenBurns] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
   const currentNarratedShotId = useRef<string | null>(null);
+  const lastNarratedSceneId = useRef<string | null>(null);
 
-  // 1. Fetch all shots for the project
+  // 1. Fetch all shots, characters, and music for the project
   useEffect(() => {
     if (!open || !projectId) return;
     setLoading(true);
-    fetch(`/api/shots?project_id=${projectId}`, {
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    })
+
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+    // 1. Fetch shots
+    fetch(`/api/shots?project_id=${projectId}`, { headers })
       .then((r) => r.json())
       .then((json) => {
         if (json.data) {
@@ -52,10 +66,25 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
       })
       .catch((err) => console.error('Error cargando tomas para animatic:', err))
       .finally(() => setLoading(false));
+
+    // 2. Fetch characters for narrative context
+    fetch(`/api/characters?project_id=${projectId}`, { headers })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data && Array.isArray(json.data)) setCharacters(json.data);
+      })
+      .catch(() => {});
+
+    // 3. Fetch music tracks for atmospheric audio
+    fetch(`/api/music?project_id=${projectId}`, { headers })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data && Array.isArray(json.data)) setMusicTracks(json.data);
+      })
+      .catch(() => {});
   }, [open, projectId, token]);
 
-  // 2. Build flattened timeline items
-  // If a scene has no shots, create a virtual shot representing the scene itself
+  // 2. Build flattened timeline items with rich project & scene context
   const timelineItems = useMemo(() => {
     if (!scenes || scenes.length === 0) return [];
     const sortedScenes = [...scenes].sort((a, b) => a.sort_order - b.sort_order);
@@ -65,6 +94,11 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
       sceneId: string;
       sceneTitle: string;
       sceneColor: string;
+      sceneObjective?: string | null;
+      sceneEmotion?: string | null;
+      sceneType?: string | null;
+      sceneTags?: string[];
+      sceneDescription?: string | null;
       shotName: string;
       description: string;
       duration: number; // in seconds
@@ -74,6 +108,7 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
       mediaType: string;
       lens?: string;
       shotType?: string;
+      movement?: string;
       cameraLetter?: string | null;
       cameraSetup?: any;
       lightingSetup?: any;
@@ -87,13 +122,17 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
         .sort((a, b) => a.sort_order - b.sort_order);
 
       if (scShots.length === 0) {
-        // Scene without explicit shots: treat whole scene as a 5-second or estimated_duration segment
         const dur = Math.max(sc.estimated_duration_secs || 5, 2);
         items.push({
           id: `sc-dummy-${sc.id}`,
           sceneId: sc.id,
           sceneTitle: sc.title,
           sceneColor: sc.color || '#3B82F6',
+          sceneObjective: sc.objective || null,
+          sceneEmotion: (sc as any).emotion || null,
+          sceneType: sc.scene_type || 'standard',
+          sceneTags: sc.tags || [],
+          sceneDescription: sc.description || null,
           shotName: 'Escena General',
           description: sc.description || sc.objective || '',
           duration: dur,
@@ -103,6 +142,7 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
           mediaType: 'none',
           lens: '35mm',
           shotType: sc.scene_type || 'Plano General',
+          movement: 'Estático',
           cameraLetter: null,
         });
         runningTime += dur;
@@ -132,6 +172,11 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
             sceneId: sc.id,
             sceneTitle: sc.title,
             sceneColor: sc.color || '#3B82F6',
+            sceneObjective: sc.objective || null,
+            sceneEmotion: (sc as any).emotion || null,
+            sceneType: sc.scene_type || 'standard',
+            sceneTags: sc.tags || [],
+            sceneDescription: sc.description || null,
             shotName: sh.name,
             description: sh.description || '',
             duration: dur,
@@ -141,6 +186,7 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
             mediaType: mType,
             lens: (sh as any).camera_setup?.lens || sh.lens,
             shotType: sh.shot_type || 'Plano Medio',
+            movement: sh.movement || 'Estático',
             cameraLetter: sh.camera_letter,
             cameraSetup: (sh as any).camera_setup,
             lightingSetup: (sh as any).lighting_setup,
@@ -152,6 +198,26 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
 
     return items;
   }, [scenes, shots]);
+
+  // Jump to initialSceneId if specified
+  useEffect(() => {
+    if (!open || !initialSceneId || timelineItems.length === 0) return;
+    const target = timelineItems.find((it) => it.sceneId === initialSceneId);
+    if (target) {
+      setCurrentTime(target.startTime);
+    }
+  }, [open, initialSceneId, timelineItems]);
+
+  // Background music audio sync
+  useEffect(() => {
+    if (!audioRef.current) return;
+    audioRef.current.volume = musicVolume;
+    if (isPlaying && musicEnabled && musicTracks.length > 0 && musicTracks[0].file_url) {
+      audioRef.current.play().catch(() => {});
+    } else {
+      audioRef.current.pause();
+    }
+  }, [isPlaying, musicEnabled, musicTracks, musicVolume]);
 
   const totalDuration = useMemo(() => {
     if (timelineItems.length === 0) return 0;
@@ -216,7 +282,7 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
     };
   }, [isPlaying, tick]);
 
-  // Trigger browser Speech Synthesis (TTS) when shot changes
+  // Trigger browser Speech Synthesis (TTS) when shot changes, including scene context
   useEffect(() => {
     if (!voiceoverEnabled || !isPlaying || !currentItem) {
       if (!voiceoverEnabled && 'speechSynthesis' in window) {
@@ -229,9 +295,22 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
       currentNarratedShotId.current = currentItem.id;
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        const textToRead = currentItem.description || currentItem.shotName;
-        if (textToRead && textToRead.length > 2) {
-          const utterance = new SpeechSynthesisUtterance(textToRead);
+
+        // Check if scene changed to announce scene context
+        const isNewScene = !lastNarratedSceneId.current || lastNarratedSceneId.current !== currentItem.sceneId;
+        lastNarratedSceneId.current = currentItem.sceneId;
+
+        let narration = '';
+        if (isNewScene && currentItem.sceneTitle) {
+          narration += `${currentItem.sceneTitle}. `;
+          if (currentItem.sceneObjective) {
+            narration += `Objetivo: ${currentItem.sceneObjective}. `;
+          }
+        }
+        narration += currentItem.description || currentItem.shotName;
+
+        if (narration && narration.length > 2) {
+          const utterance = new SpeechSynthesisUtterance(narration);
           utterance.lang = 'es-ES';
           utterance.rate = 1.05;
           window.speechSynthesis.speak(utterance);
@@ -247,7 +326,7 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
     }
   }, [isPlaying]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (Space: play, Arrows/J/L: nav, F: fullscreen, C: context, I: intro, M: music)
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -265,10 +344,23 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         toggleFullscreen();
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        setShowContextDrawer((v) => !v);
+      } else if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        setShowIntroSlate((v) => !v);
+      } else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        setMusicEnabled((m) => !m);
       } else if (e.code === 'Escape') {
         if (isFullscreen) {
           document.exitFullscreen?.();
           setIsFullscreen(false);
+        } else if (showContextDrawer) {
+          setShowContextDrawer(false);
+        } else if (showIntroSlate) {
+          setShowIntroSlate(false);
         } else {
           onClose();
         }
@@ -276,7 +368,7 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, isFullscreen, currentItemIndex, timelineItems]);
+  }, [open, isFullscreen, showContextDrawer, showIntroSlate, currentItemIndex, timelineItems]);
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -358,6 +450,47 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
           </div>
 
           <button
+            onClick={() => setShowContextDrawer((v) => !v)}
+            className={`p-2 rounded-lg border transition-all text-xs flex items-center gap-1.5 ${
+              showContextDrawer
+                ? 'bg-accent-blue/25 border-accent-blue/50 text-accent-blue'
+                : 'bg-surface border-surface-edge text-text-muted hover:text-white'
+            }`}
+            title="Biblia de Producción & Contexto del Proyecto (C)"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-2xs font-semibold">Contexto</span>
+          </button>
+
+          <button
+            onClick={() => setShowIntroSlate((v) => !v)}
+            className={`p-2 rounded-lg border transition-all text-xs flex items-center gap-1.5 ${
+              showIntroSlate
+                ? 'bg-accent-amber/25 border-accent-amber/50 text-accent-amber'
+                : 'bg-surface border-surface-edge text-text-muted hover:text-white'
+            }`}
+            title="Claqueta de Presentación Oficial del Proyecto (I)"
+          >
+            <Clapperboard className="w-3.5 h-3.5" />
+            <span className="hidden md:inline text-2xs font-semibold">Claqueta</span>
+          </button>
+
+          {musicTracks.length > 0 && (
+            <button
+              onClick={() => setMusicEnabled((m) => !m)}
+              className={`p-2 rounded-lg border transition-all text-xs flex items-center gap-1.5 ${
+                musicEnabled
+                  ? 'bg-accent-green/25 border-accent-green/50 text-accent-green'
+                  : 'bg-surface border-surface-edge text-text-muted hover:text-white'
+              }`}
+              title={musicEnabled ? 'Pausar música ambiental (M)' : 'Activar música ambiental (M)'}
+            >
+              <Music className="w-3.5 h-3.5" />
+              <span className="hidden md:inline text-2xs font-semibold">Música</span>
+            </button>
+          )}
+
+          <button
             onClick={() => setShowTechnicalHUD((v) => !v)}
             className={`p-2 rounded-lg border transition-all text-xs flex items-center gap-1.5 ${
               showTechnicalHUD
@@ -435,16 +568,38 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
               />
             )
           ) : (
-            /* Modern Cinematographic Slate Placeholder */
+            /* Modern Cinematographic Slate Placeholder with Full Project & Scene Context */
             <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-[#11131a] to-[#0a0b10] border border-white/5 relative">
-              <div
-                className="absolute top-4 left-4 px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider uppercase text-white shadow-sm"
-                style={{ backgroundColor: currentItem?.sceneColor || '#3b82f6' }}
-              >
-                {currentItem?.sceneTitle || 'Escena'}
+              <div className="absolute top-4 left-4 flex items-center gap-2">
+                <div
+                  className="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider uppercase text-white shadow-sm"
+                  style={{ backgroundColor: currentItem?.sceneColor || '#3b82f6' }}
+                >
+                  {currentItem?.sceneTitle || 'Escena'}
+                </div>
+                {currentItem?.sceneEmotion && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-accent-amber/20 text-accent-amber border border-accent-amber/30">
+                    🎭 {currentItem.sceneEmotion}
+                  </span>
+                )}
               </div>
 
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4 text-white/40">
+              {/* Project Title Watermark in Slate */}
+              {(project?.title || projectTitle) && (
+                <div className="absolute top-4 right-4 text-[10px] font-mono tracking-widest uppercase text-white/30 truncate max-w-xs">
+                  {project?.title || projectTitle}
+                </div>
+              )}
+
+              {/* Dramatic Objective Context Banner */}
+              {currentItem?.sceneObjective && (
+                <div className="max-w-md mb-3 px-3.5 py-1.5 rounded-full bg-accent-amber/15 border border-accent-amber/30 text-amber-200 text-xs shadow-sm flex items-center gap-1.5">
+                  <span className="font-bold text-accent-amber">🎯 Objetivo:</span>
+                  <span className="truncate">{currentItem.sceneObjective}</span>
+                </div>
+              )}
+
+              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4 text-white/40 shadow-inner">
                 <Camera className="w-8 h-8" />
               </div>
 
@@ -456,6 +611,11 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
                 {currentItem?.shotType && (
                   <span className="px-2 py-0.5 rounded bg-accent-blue/20 text-accent-blue border border-accent-blue/30 text-xs font-semibold">
                     {currentItem.shotType}
+                  </span>
+                )}
+                {currentItem?.movement && (
+                  <span className="px-2 py-0.5 rounded bg-accent-violet/20 text-accent-violet border border-accent-violet/30 text-xs font-semibold">
+                    {currentItem.movement}
                   </span>
                 )}
                 {currentItem?.lens && (
@@ -471,57 +631,151 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
               </div>
 
               {currentItem?.description && (
-                <p className="max-w-md text-sm text-text-muted italic bg-black/40 px-4 py-2 rounded-lg border border-white/5">
+                <p className="max-w-md text-sm text-text-muted italic bg-black/50 px-4 py-2.5 rounded-xl border border-white/10 shadow-lg">
                   &ldquo;{currentItem.description}&rdquo;
                 </p>
               )}
             </div>
           )}
 
-          {/* Director's Technical HUD Overlay (Upper Left) */}
+          {/* Director's Technical & Narrative HUD Overlay (Upper Left) */}
           <AnimatePresence>
             {showTechnicalHUD && currentItem && (
               <motion.div
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
-                className="absolute top-4 left-4 z-10 bg-black/75 backdrop-blur-md border border-white/15 rounded-xl p-3 max-w-xs space-y-1.5 pointer-events-none shadow-xl"
+                className="absolute top-4 left-4 z-10 bg-black/80 backdrop-blur-md border border-white/15 rounded-xl p-3 max-w-sm space-y-2 pointer-events-none shadow-2xl"
               >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: currentItem.sceneColor }}
-                  />
-                  <span className="text-2xs font-bold text-white uppercase tracking-wider truncate">
-                    {currentItem.sceneTitle}
-                  </span>
-                </div>
-
-                <div className="text-xs font-bold text-accent-blue flex items-center gap-1.5">
-                  <span>{currentItem.shotName}</span>
-                  {currentItem.cameraLetter && (
-                    <span className="px-1 rounded bg-accent-violet text-[9px] text-white">
-                      CÁM {currentItem.cameraLetter}
+                {/* Scene Header & Emotion */}
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                      style={{ backgroundColor: currentItem.sceneColor }}
+                    />
+                    <span className="text-2xs font-bold text-white uppercase tracking-wider truncate">
+                      {currentItem.sceneTitle}
+                    </span>
+                  </div>
+                  {currentItem.sceneEmotion && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-amber/20 text-accent-amber border border-accent-amber/30 shrink-0">
+                      🎭 {currentItem.sceneEmotion}
                     </span>
                   )}
                 </div>
 
-                {currentItem.cameraSetup && (
-                  <div className="text-[10px] text-text-secondary font-mono border-t border-white/10 pt-1 flex flex-col gap-0.5">
-                    <span className="text-white/90">
-                      🎥 {currentItem.cameraSetup.camera_model || 'Cámara'} ({currentItem.cameraSetup.lens || currentItem.lens}) &bull; {currentItem.cameraSetup.aperture || 'f/2.8'}
-                    </span>
-                    <span>
-                      ISO {currentItem.cameraSetup.iso || 800} &bull; {currentItem.cameraSetup.color_profile?.split(' ')[0] || 'Log'}
-                    </span>
+                {/* Scene Objective (Dramaturgical Context) */}
+                {currentItem.sceneObjective && (
+                  <div className="text-[11px] text-amber-200/90 leading-snug">
+                    <span className="font-semibold text-amber-400">🎯 Objetivo: </span>
+                    {currentItem.sceneObjective}
                   </div>
                 )}
 
-                {currentItem.lightingSetup?.key_light && (
-                  <div className="text-[10px] text-accent-amber font-mono border-t border-white/10 pt-1">
-                    💡 Key: {currentItem.lightingSetup.key_light.type || 'Luz Principal'} ({currentItem.lightingSetup.key_light.color_temp || '5600K'})
+                {/* Shot Details & Camera Movement */}
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-accent-blue flex items-center justify-between gap-1.5">
+                    <span className="truncate">{currentItem.shotName}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {currentItem.cameraLetter && (
+                        <span className="px-1 rounded bg-accent-violet text-[9px] text-white font-mono font-bold">
+                          CÁM {currentItem.cameraLetter}
+                        </span>
+                      )}
+                      {currentItem.movement && (
+                        <span className="px-1 rounded bg-white/10 text-[9px] text-white/80 font-mono">
+                          {currentItem.movement}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
+
+                  {/* Technical Specs */}
+                  <div className="text-[10px] text-text-secondary font-mono flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/10 pt-1">
+                    {currentItem.lens && <span>🎥 {currentItem.lens}</span>}
+                    {currentItem.shotType && <span>📐 {currentItem.shotType}</span>}
+                    {currentItem.cameraSetup?.aperture && <span>⭕ {currentItem.cameraSetup.aperture}</span>}
+                    {currentItem.cameraSetup?.iso && <span>ISO {currentItem.cameraSetup.iso}</span>}
+                    {currentItem.lightingSetup?.key_light?.type && (
+                      <span className="text-accent-amber w-full truncate">
+                        💡 {currentItem.lightingSetup.key_light.type}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Scene Tags */}
+                  {currentItem.sceneTags && currentItem.sceneTags.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                      {currentItem.sceneTags.map((tag) => (
+                        <span key={tag} className="text-[8px] font-bold px-1 py-0.2 rounded bg-white/5 border border-white/10 text-white/60">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Intro Slate (Cinematic Production Title Card) */}
+          <AnimatePresence>
+            {showIntroSlate && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                className="absolute inset-0 z-20 bg-black/92 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center"
+              >
+                <div className="max-w-xl space-y-5">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-blue to-accent-violet mx-auto flex items-center justify-center shadow-xl shadow-accent-blue/25">
+                    <Film className="w-7 h-7 text-white" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-2xs font-mono uppercase tracking-widest text-accent-blue font-bold">
+                      PRODUCCIÓN AUDIOVISUAL &bull; {project?.template_category ? project.template_category.toUpperCase() : 'STORYBOARD'}
+                    </span>
+                    <h1 className="text-2xl sm:text-4xl font-black text-white tracking-wide uppercase">
+                      {project?.title || projectTitle}
+                    </h1>
+                    {project?.description && (
+                      <p className="text-sm text-text-muted max-w-lg mx-auto italic leading-relaxed pt-1">
+                        &ldquo;{project.description}&rdquo;
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-center gap-3 text-xs font-mono text-text-secondary border-y border-white/10 py-3">
+                    <div><strong className="text-white">{scenes.length}</strong> Escenas</div>
+                    <div>&bull;</div>
+                    <div><strong className="text-white">{timelineItems.length}</strong> Planos</div>
+                    <div>&bull;</div>
+                    <div><strong className="text-white">{Math.round(totalDuration)}s</strong> Duración</div>
+                    <div>&bull;</div>
+                    <div><strong className="text-white">{aspectRatio}</strong> Formato</div>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setShowIntroSlate(false);
+                        setIsPlaying(true);
+                      }}
+                      className="px-6 py-2.5 rounded-xl bg-accent-blue text-white font-bold text-sm hover:bg-accent-blue/90 transition-all flex items-center gap-2 shadow-lg shadow-accent-blue/30"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Comenzar Reproducción</span>
+                    </button>
+                    <button
+                      onClick={() => setShowIntroSlate(false)}
+                      className="px-4 py-2.5 rounded-xl bg-white/10 text-white/80 hover:text-white hover:bg-white/15 transition-all text-xs font-semibold"
+                    >
+                      Cerrar Claqueta
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -677,6 +931,201 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
           </div>
         </div>
       </div>
+
+      {/* Context Drawer & Production Bible */}
+      <AnimatePresence>
+        {showContextDrawer && (
+          <motion.div
+            initial={{ x: '100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="absolute right-0 top-14 bottom-28 w-80 sm:w-96 z-40 bg-[#0e1017]/95 backdrop-blur-2xl border-l border-surface-edge p-5 overflow-y-auto space-y-5 shadow-2xl"
+          >
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between border-b border-surface-edge pb-3">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-accent-blue" />
+                <h3 className="text-sm font-bold text-white tracking-wide">Contexto del Proyecto</h3>
+              </div>
+              <button
+                onClick={() => setShowContextDrawer(false)}
+                className="p-1 rounded-lg text-text-muted hover:text-white hover:bg-surface"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Project Overview */}
+            <div className="space-y-2">
+              <div className="text-2xs uppercase tracking-wider text-text-muted font-bold">
+                Proyecto & Sinopsis
+              </div>
+              <div className="p-3.5 rounded-xl bg-surface/70 border border-surface-edge space-y-2">
+                <h4 className="text-sm font-bold text-white">{project?.title || projectTitle}</h4>
+                {project?.description ? (
+                  <p className="text-xs text-text-muted leading-relaxed italic">
+                    &ldquo;{project.description}&rdquo;
+                  </p>
+                ) : (
+                  <p className="text-xs text-text-muted italic">Sin sinopsis registrada</p>
+                )}
+                <div className="flex items-center gap-2 pt-1 text-[11px] text-text-secondary font-mono border-t border-white/5">
+                  <span>{scenes.length} escenas</span> &bull; <span>{timelineItems.length} tomas</span> &bull; <span>{Math.round(totalDuration)}s</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Scene Context */}
+            {currentItem && (
+              <div className="space-y-2">
+                <div className="text-2xs uppercase tracking-wider text-text-muted font-bold flex items-center justify-between">
+                  <span>Escena Activa</span>
+                  <span className="text-accent-blue font-semibold">Toma {currentItemIndex + 1}/{timelineItems.length}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-surface/70 border border-surface-edge space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: currentItem.sceneColor }} />
+                    <span className="text-sm font-bold text-white truncate">{currentItem.sceneTitle}</span>
+                  </div>
+
+                  {currentItem.sceneObjective && (
+                    <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-lg leading-relaxed">
+                      <strong className="text-amber-400 block mb-0.5 text-2xs uppercase tracking-wider">Objetivo Dramático:</strong>
+                      {currentItem.sceneObjective}
+                    </div>
+                  )}
+
+                  {currentItem.sceneEmotion && (
+                    <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                      <span className="text-2xs uppercase tracking-wider text-text-muted">Emoción:</span>
+                      <span className="font-semibold text-white">🎭 {currentItem.sceneEmotion}</span>
+                    </div>
+                  )}
+
+                  {currentItem.description && (
+                    <div className="text-xs text-text-muted bg-black/40 p-2.5 rounded-lg border border-white/5">
+                      <strong className="text-white/70 block mb-0.5 text-2xs uppercase tracking-wider">Acción / Diálogo:</strong>
+                      {currentItem.description}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Characters List */}
+            {characters.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-2xs uppercase tracking-wider text-text-muted font-bold flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-accent-violet" />
+                  <span>Personajes ({characters.length})</span>
+                </div>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {characters.map((char) => (
+                    <div key={char.id} className="p-2 rounded-lg bg-surface/50 border border-surface-edge flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-accent-violet/20 text-accent-violet font-bold flex items-center justify-center text-xs shrink-0">
+                        {char.avatar_url ? (
+                          <img src={char.avatar_url} alt={char.name} className="w-full h-full object-cover rounded-lg" />
+                        ) : (
+                          char.name?.[0] || 'P'
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-white truncate">{char.name}</div>
+                        <div className="text-[10px] text-text-muted truncate">{char.role || char.actor_name || 'Personaje'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Music / Atmosphere Control */}
+            {musicTracks.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-2xs uppercase tracking-wider text-text-muted font-bold flex items-center gap-1.5">
+                  <Music className="w-3.5 h-3.5 text-accent-green" />
+                  <span>Banda Sonora</span>
+                </div>
+                <div className="p-3 rounded-xl bg-surface/60 border border-surface-edge space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-white truncate">{musicTracks[0].name || 'Pista de Audio'}</span>
+                    <button
+                      onClick={() => setMusicEnabled((m) => !m)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                        musicEnabled
+                          ? 'bg-accent-green/20 text-accent-green border-accent-green/40'
+                          : 'bg-surface text-text-muted border-surface-edge hover:text-white'
+                      }`}
+                    >
+                      {musicEnabled ? 'Activa' : 'Pausada'}
+                    </button>
+                  </div>
+                  {musicEnabled && (
+                    <div className="flex items-center gap-2 text-2xs text-text-muted pt-1">
+                      <Volume1 className="w-3.5 h-3.5 shrink-0" />
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={musicVolume}
+                        onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
+                        className="w-full accent-accent-green h-1 bg-surface-raised rounded-lg cursor-pointer"
+                      />
+                      <span className="font-mono text-[9px] w-6">{Math.round(musicVolume * 100)}%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Scene Index & Fast Jump */}
+            <div className="space-y-2">
+              <div className="text-2xs uppercase tracking-wider text-text-muted font-bold">
+                Índice de Escenas
+              </div>
+              <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+                {scenes.map((sc) => {
+                  const firstItemOfScene = timelineItems.find((it) => it.sceneId === sc.id);
+                  const isCurrentScene = currentItem?.sceneId === sc.id;
+                  return (
+                    <button
+                      key={sc.id}
+                      onClick={() => {
+                        if (firstItemOfScene) setCurrentTime(firstItemOfScene.startTime);
+                      }}
+                      className={`w-full text-left p-2 rounded-lg border transition-all flex items-center justify-between text-xs ${
+                        isCurrentScene
+                          ? 'bg-accent-blue/15 border-accent-blue/40 text-white font-semibold'
+                          : 'bg-surface/40 border-surface-edge text-text-muted hover:text-white hover:bg-surface'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sc.color || '#3b82f6' }} />
+                        <span className="truncate">{sc.title}</span>
+                      </div>
+                      <span className="text-[10px] font-mono shrink-0 text-text-muted ml-2">
+                        {sc.estimated_duration_secs || 5}s
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Audio element for project background music */}
+      {musicTracks.length > 0 && musicTracks[0].file_url && (
+        <audio
+          ref={audioRef}
+          src={musicTracks[0].file_url}
+          loop
+          preload="auto"
+        />
+      )}
     </div>,
     document.body
   );

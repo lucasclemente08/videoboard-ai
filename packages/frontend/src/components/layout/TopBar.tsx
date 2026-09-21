@@ -20,7 +20,7 @@ export function TopBar() {
   const navigate = useNavigate();
   const { toggleSidebar, sidebarOpen, viewMode } = useUIStore();
   const { currentProject } = useProjectStore();
-  const { scenes } = useSceneStore();
+  const { scenes, selectedSceneId } = useSceneStore();
   const { toggleAIPanel } = useAIStore();
   const { token, user, logout } = useAuthStore();
   const isInProject = location.pathname.startsWith('/project/');
@@ -260,8 +260,10 @@ export function TopBar() {
             open={animaticOpen}
             onClose={() => setAnimaticOpen(false)}
             projectId={projectId}
+            project={currentProject}
             projectTitle={currentProject?.title}
             scenes={scenes || []}
+            initialSceneId={selectedSceneId}
           />
           <SlateModal
             open={slateOpen}
