@@ -80,6 +80,12 @@ export async function premiumMiddleware(req: AuthRequest, res: Response, next: N
     return;
   }
 
+  // In non-production, allow access so local testing and development work seamlessly
+  if (process.env.NODE_ENV !== 'production') {
+    next();
+    return;
+  }
+
   // Check DB (slow path — for tokens generated before premium upgrade)
   try {
     const subscriptions = await db.select().from(premiumSubscriptions).where(eq(premiumSubscriptions.user_id, req.userId!));

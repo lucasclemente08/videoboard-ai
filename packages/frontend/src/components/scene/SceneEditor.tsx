@@ -115,7 +115,7 @@ export function SceneEditor() {
       case 'story':
         return <StorytellingPanel scene={scene} onUpdate={handleUpdate} />;
       case 'shots':
-        return <ShotListPanel sceneId={scene.id} />;
+        return <ShotListPanel sceneId={scene.id} projectId={scene.project_id} />;
       case 'ai':
         return <AITab scene={scene} />;
       default:

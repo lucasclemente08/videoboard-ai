@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, GripVertical, Camera, Clock, ChevronDown, ChevronRight,
   Trash2, Image, Upload, Music, Video, FileText, Loader2, Play,
-  Maximize2, X, ExternalLink, Sparkles, Clapperboard, Star
+  Maximize2, X, ExternalLink, Sparkles, Clapperboard, Star, Wand2
 } from 'lucide-react';
 import { useShots, useCreateShot, useUpdateShot, useDeleteShot } from '../../api/hooks';
 import { api } from '../../api/client';
@@ -11,6 +11,7 @@ import { clsx } from 'clsx';
 import type { Shot } from '@videoboard/shared';
 import { mediaDragState } from '../../services/eventBus';
 import { CameraLightingEditor } from './CameraLightingEditor';
+import { ShotAIGeneratorModal } from './ShotAIGeneratorModal';
 
 const shotTypeLabels: Record<string, string> = {
   close_up: 'Primer plano', medium_shot: 'Plano medio', american_shot: 'Plano americano',
@@ -37,7 +38,7 @@ function formatFileSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function ShotDropZone({ shot, updateShot }: { shot: Shot; updateShot: any }) {
+function ShotDropZone({ shot, updateShot, onOpenAI }: { shot: Shot; updateShot: any; onOpenAI?: () => void }) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<MediaItem | null>(null);
@@ -275,9 +276,24 @@ function ShotDropZone({ shot, updateShot }: { shot: Shot; updateShot: any }) {
                   <p className="text-xs font-semibold text-text-primary">Subir archivos para esta toma</p>
                   <p className="text-2xs text-text-muted mt-0.5">Arrastra desde tu PC o haz clic para examinar</p>
                 </div>
-                <span className="px-3 py-1 rounded-lg bg-surface-raised border border-surface-edge text-2xs font-medium text-accent-blue hover:bg-surface-hover shadow-sm">
-                  Examinar archivos
-                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="px-3 py-1 rounded-lg bg-surface-raised border border-surface-edge text-2xs font-medium text-accent-blue hover:bg-surface-hover shadow-sm">
+                    Examinar archivos
+                  </span>
+                  {onOpenAI && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenAI();
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-accent-violet to-accent-blue text-white text-2xs font-semibold hover:opacity-90 shadow-sm transition-all"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Generar con IA
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -293,12 +309,24 @@ function ShotDropZone({ shot, updateShot }: { shot: Shot; updateShot: any }) {
         {mediaItems.length > 0 && !uploading && (
           <div className="flex items-center justify-between pt-1 border-t border-surface-edge text-2xs text-text-muted">
             <span>{mediaItems.length} archivo{mediaItems.length !== 1 ? 's' : ''}</span>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="text-accent-blue hover:underline font-medium"
-            >
-              + Añadir archivo
-            </button>
+            <div className="flex items-center gap-2.5">
+              {onOpenAI && (
+                <button
+                  type="button"
+                  onClick={onOpenAI}
+                  className="flex items-center gap-1 text-accent-violet hover:text-accent-violet/80 font-semibold transition-colors"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Generar IA
+                </button>
+              )}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="text-accent-blue hover:underline font-medium"
+              >
+                + Añadir archivo
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -377,12 +405,13 @@ function ShotDropZone({ shot, updateShot }: { shot: Shot; updateShot: any }) {
   );
 }
 
-export function ShotListPanel({ sceneId }: { sceneId: string }) {
+export function ShotListPanel({ sceneId, projectId }: { sceneId: string; projectId?: string }) {
   const { data: shots, isLoading } = useShots(sceneId);
   const createShot = useCreateShot();
   const updateShot = useUpdateShot();
   const deleteShot = useDeleteShot();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [aiModalShot, setAiModalShot] = useState<Shot | null>(null);
 
   const handleAdd = async () => {
     await createShot.mutateAsync({ scene_id: sceneId, name: `Toma ${(shots?.length || 0) + 1}` });
@@ -448,6 +477,18 @@ export function ShotListPanel({ sceneId }: { sceneId: string }) {
             </div>
             <div className="flex items-center gap-1">
               <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAiModalShot(shot);
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-md bg-accent-violet/10 hover:bg-accent-violet/20 text-accent-violet text-3xs font-bold border border-accent-violet/25 shadow-sm transition-all mr-1"
+                title="Generar fotograma de Storyboard con IA"
+              >
+                <Sparkles className="w-3 h-3 text-accent-violet" />
+                <span>IA</span>
+              </button>
+              <button
                 onClick={(e) => { e.stopPropagation(); deleteShot.mutate(shot.id); }}
                 className="p-1 rounded hover:bg-surface-hover opacity-0 group-hover:opacity-100 transition-all"
                 title="Eliminar toma"
@@ -502,7 +543,7 @@ export function ShotListPanel({ sceneId }: { sceneId: string }) {
                 <label className="block text-2xs font-semibold text-text-primary mb-1.5">
                   Archivos & Storyboard de la toma
                 </label>
-                <ShotDropZone shot={shot} updateShot={updateShot} />
+                <ShotDropZone shot={shot} updateShot={updateShot} onOpenAI={() => setAiModalShot(shot)} />
               </div>
 
               <div>
@@ -622,6 +663,16 @@ export function ShotListPanel({ sceneId }: { sceneId: string }) {
         <div className="space-y-2">
           {[1, 2, 3].map((i) => <div key={i} className="h-12 rounded-xl bg-surface animate-pulse" />)}
         </div>
+      )}
+
+      {aiModalShot && (
+        <ShotAIGeneratorModal
+          open={!!aiModalShot}
+          onClose={() => setAiModalShot(null)}
+          shot={aiModalShot}
+          sceneId={sceneId}
+          projectId={projectId}
+        />
       )}
     </div>
   );
