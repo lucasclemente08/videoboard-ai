@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Film, Clock, Trash2, FolderGit2, Compass, Sparkles } from 'lucide-react';
+import { Plus, Film, Clock, Trash2, FolderGit2, Compass, Sparkles, Upload } from 'lucide-react';
 import { useProjects, useCreateProject, useDeleteProject } from '../api/hooks';
 import { useProjectStore } from '../stores/useProjectStore';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -14,9 +14,45 @@ export function Home() {
   const createProject = useCreateProject();
   const deleteProject = useDeleteProject();
   const { setCurrentProject } = useProjectStore();
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   const [showNewModal, setShowNewModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target?.result as string;
+      const isJson = file.name.endsWith('.json');
+      try {
+        const res = await fetch('/api/projects/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            format: isJson ? 'json' : 'markdown',
+            content,
+          }),
+        });
+        const json = await res.json();
+        if (json.data) {
+          setCurrentProject(json.data);
+          navigate(`/project/${json.data.id}`);
+        } else {
+          alert(json.error?.message || 'Error al importar proyecto');
+        }
+      } catch {
+        alert('Error al conectar con el servidor');
+      }
+    };
+    reader.readAsText(file);
+    if (importFileInputRef.current) importFileInputRef.current.value = '';
+  };
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
@@ -50,6 +86,21 @@ export function Home() {
             <p className="text-xs text-text-muted mt-0.5">Tus proyectos audiovisuales</p>
           </div>
           <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={importFileInputRef}
+              onChange={handleImportFile}
+              accept=".json,.md,.markdown,.txt"
+              className="hidden"
+            />
+            <button
+              onClick={() => importFileInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-surface-raised border border-surface-edge text-text-primary rounded-xl text-xs font-semibold hover:border-accent-blue/50 hover:bg-surface-hover transition-all shadow-xs"
+              title="Importar proyecto desde archivo .json o .md"
+            >
+              <Upload className="w-4 h-4 text-accent-blue" />
+              Importar (.json / .md)
+            </button>
             <button
               onClick={() => navigate('/templates')}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-surface-raised border border-surface-edge text-text-primary rounded-xl text-xs font-semibold hover:border-accent-blue/50 hover:bg-surface-hover transition-all shadow-xs"

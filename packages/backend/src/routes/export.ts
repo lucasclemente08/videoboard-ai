@@ -33,6 +33,15 @@ exportRouter.get('/json', async (req: AuthRequest, res) => {
     }
 
     const projectScenes = await db.select().from(scenes).where(eq(scenes.project_id, projectId)).orderBy(asc(scenes.sort_order));
+    const scenesWithShots = [];
+    for (const sc of projectScenes) {
+      const scShots = await db.select().from(shots).where(eq(shots.scene_id, sc.id)).orderBy(asc(shots.sort_order));
+      scenesWithShots.push({
+        ...sc,
+        shots: scShots,
+      });
+    }
+
     const connections = await db.select().from(sceneConnections).where(eq(sceneConnections.project_id, projectId));
     const projectCharacters = await db.select().from(characters).where(eq(characters.project_id, projectId));
     const projectLocations = await db.select().from(locations).where(eq(locations.project_id, projectId));
@@ -41,7 +50,7 @@ exportRouter.get('/json', async (req: AuthRequest, res) => {
     const exportBundle = {
       project,
       exported_at: new Date().toISOString(),
-      scenes: projectScenes,
+      scenes: scenesWithShots,
       connections,
       characters: projectCharacters,
       locations: projectLocations,
@@ -51,6 +60,51 @@ exportRouter.get('/json', async (req: AuthRequest, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="${project.title.replace(/[^a-zA-Z0-9]/g, '_')}_export.json"`);
     res.send(JSON.stringify(exportBundle, null, 2));
+  } catch (err) {
+    res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
+  }
+});
+
+// GET /api/export/md?project_id=... or GET /api/export/markdown?project_id=...
+exportRouter.get(['/md', '/markdown'], async (req: AuthRequest, res) => {
+  try {
+    const projectId = req.query.project_id as string;
+    if (!projectId) {
+      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'project_id es requerido' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para exportar este proyecto' } });
+      return;
+    }
+
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+    if (!project) {
+      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Proyecto no encontrado' } });
+      return;
+    }
+
+    const projectScenes = await db.select().from(scenes).where(eq(scenes.project_id, projectId)).orderBy(asc(scenes.sort_order));
+    const scenesWithShots = [];
+    for (const sc of projectScenes) {
+      const scShots = await db.select().from(shots).where(eq(shots.scene_id, sc.id)).orderBy(asc(shots.sort_order));
+      scenesWithShots.push({
+        ...sc,
+        shots: scShots,
+      });
+    }
+
+    const { projectToMarkdown } = await import('../services/projectSerializer');
+    const mdContent = projectToMarkdown({
+      project: project as any,
+      scenes: scenesWithShots as any,
+    });
+
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${project.title.replace(/[^a-zA-Z0-9]/g, '_')}.md"`);
+    res.send(mdContent);
   } catch (err) {
     res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
   }

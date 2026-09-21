@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Film, ChevronLeft, Share2, MoreHorizontal, Users, History, Download, Check, Copy, Sparkles, Crown, LogOut, ChevronDown, Play, Clapperboard } from 'lucide-react';
+import { Film, ChevronLeft, Share2, MoreHorizontal, Users, History, Download, Check, Copy, Sparkles, Crown, LogOut, ChevronDown, Play, Clapperboard, Code2, FileCode } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSceneStore } from '../../stores/useSceneStore';
@@ -9,6 +9,7 @@ import { PremiumModal } from '../premium/PremiumModal';
 import { AnimaticModal } from '../animatic/AnimaticModal';
 import { SlateModal } from '../slate/SlateModal';
 import { ShareModal } from '../collaboration/ShareModal';
+import { ProjectCodeModal } from '../project/ProjectCodeModal';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
@@ -29,6 +30,7 @@ export function TopBar() {
   const [animaticOpen, setAnimaticOpen] = useState(false);
   const [slateOpen, setSlateOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [codeModalOpen, setCodeModalOpen] = useState(false);
   const premiumActive = user?.isPremium || false;
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -62,7 +64,7 @@ export function TopBar() {
     });
   };
 
-  const handleExport = (format: 'pdf' | 'csv' | 'json' = 'pdf') => {
+  const handleExport = (format: 'pdf' | 'csv' | 'json' | 'md' = 'pdf') => {
     const projectId = location.pathname.split('/')[2];
     if (projectId) {
       setExportMenuOpen(false);
@@ -115,6 +117,14 @@ export function TopBar() {
               <Clapperboard className="w-3.5 h-3.5" />
               <span>Claqueta</span>
             </button>
+            <button
+              onClick={() => setCodeModalOpen(true)}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-surface border border-surface-edge text-text-primary hover:border-accent-blue/50 hover:bg-surface-hover transition-all flex items-center gap-1.5 shadow-xs mr-1"
+              title="Modificar proyecto directamente en JSON o Markdown (.md)"
+            >
+              <Code2 className="w-3.5 h-3.5 text-accent-blue" />
+              <span>Código</span>
+            </button>
             <button className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors" title="Colaboradores">
               <Users className="w-4 h-4 text-text-muted" />
             </button>
@@ -130,7 +140,7 @@ export function TopBar() {
                 <Download className="w-4 h-4 text-text-muted" />
               </button>
               {exportMenuOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-48 bg-surface-raised border border-surface-edge rounded-xl shadow-xl py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute right-0 top-full mt-1.5 w-52 bg-surface-raised border border-surface-edge rounded-xl shadow-xl py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
                   <button
                     onClick={() => handleExport('pdf')}
                     className="w-full text-left px-3.5 py-2 hover:bg-surface-hover transition-colors flex items-center gap-2 text-text-primary"
@@ -147,7 +157,23 @@ export function TopBar() {
                     onClick={() => handleExport('json')}
                     className="w-full text-left px-3.5 py-2 hover:bg-surface-hover transition-colors flex items-center gap-2 text-text-primary"
                   >
-                    <span>📦</span> Copia JSON
+                    <span>📦</span> Descargar JSON Completo
+                  </button>
+                  <button
+                    onClick={() => handleExport('md')}
+                    className="w-full text-left px-3.5 py-2 hover:bg-surface-hover transition-colors flex items-center gap-2 text-text-primary"
+                  >
+                    <span>📝</span> Guion Markdown (.md)
+                  </button>
+                  <div className="my-1 border-t border-surface-edge" />
+                  <button
+                    onClick={() => {
+                      setExportMenuOpen(false);
+                      setCodeModalOpen(true);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-surface-hover text-accent-blue transition-colors flex items-center gap-2 font-medium"
+                  >
+                    <Code2 className="w-3.5 h-3.5" /> Modificar Código (JSON / .md)
                   </button>
                 </div>
               )}
@@ -249,6 +275,11 @@ export function TopBar() {
             onClose={() => setShareOpen(false)}
             projectId={projectId}
             projectTitle={currentProject?.title}
+          />
+          <ProjectCodeModal
+            open={codeModalOpen}
+            onClose={() => setCodeModalOpen(false)}
+            projectId={projectId}
           />
         </>
       )}
