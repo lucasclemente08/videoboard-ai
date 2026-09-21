@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
@@ -312,10 +313,10 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       ref={containerRef}
-      className="fixed inset-0 z-50 bg-[#08090c] text-white flex flex-col select-none overflow-hidden"
+      className="fixed inset-0 z-[99999] bg-[#08090c] text-white flex flex-col select-none overflow-hidden"
     >
       {/* Top Bar Navigation */}
       <div className="h-14 px-4 bg-[#0e1017] border-b border-surface-edge flex items-center justify-between shrink-0">
@@ -676,6 +677,7 @@ export function AnimaticModal({ open, onClose, projectId, projectTitle, scenes }
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

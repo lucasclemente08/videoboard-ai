@@ -69,7 +69,7 @@ export function TopBar() {
   };
 
   return (
-    <header className="h-12 bg-surface-raised border-b border-surface-edge flex items-center justify-between px-3 shrink-0 z-10">
+    <header className="h-12 bg-surface-raised border-b border-surface-edge flex items-center justify-between px-3 shrink-0 z-30">
       <div className="flex items-center gap-2 min-w-0">
         {isInProject && !sidebarOpen && (
           <button onClick={toggleSidebar} className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors">

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Maximize2, Minimize2, Volume2, VolumeX, Check, AlertCircle,
@@ -207,9 +208,75 @@ export function SlateModal({
     return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(ff)}`;
   }, []);
 
+  // Ensure at least one scene and shot exist for the project
+  const ensureSceneAndShot = async (): Promise<{ sceneId: string; shotId: string } | null> => {
+    let scId = selectedSceneId;
+    let shId = selectedShotId;
+
+    if (!scId) {
+      try {
+        const scRes = await fetch('/api/scenes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            project_id: projectId,
+            title: 'Escena 1',
+            sort_order: 0,
+          }),
+        });
+        const scJson = await scRes.json();
+        if (scJson.data) {
+          scId = scJson.data.id;
+          setSelectedSceneId(scId);
+        }
+      } catch (err) {
+        console.error('Error auto-creando escena:', err);
+      }
+    }
+
+    if (scId && !shId) {
+      try {
+        const shRes = await fetch('/api/shots', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            scene_id: scId,
+            name: 'Plano 1',
+            sort_order: 0,
+          }),
+        });
+        const shJson = await shRes.json();
+        if (shJson.data) {
+          shId = shJson.data.id;
+          setSelectedShotId(shId);
+          setShots([shJson.data]);
+        }
+      } catch (err) {
+        console.error('Error auto-creando plano:', err);
+      }
+    }
+
+    return scId && shId ? { sceneId: scId, shotId: shId } : null;
+  };
+
   // Toggle Recording (Roll / Cut)
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (!isRolling) {
+      // Ensure we have an active scene and shot to record to
+      let currentShot = selectedShotId;
+      if (!currentShot) {
+        const created = await ensureSceneAndShot();
+        if (created) {
+          currentShot = created.shotId;
+        }
+      }
+
       // START ROLLING
       setIsRolling(true);
       const start = Date.now();
@@ -390,11 +457,11 @@ export function SlateModal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <div
         ref={containerRef}
-        className="fixed inset-0 z-50 bg-black flex flex-col font-mono select-none overflow-hidden"
+        className="fixed inset-0 z-[99999] bg-black flex flex-col font-mono select-none overflow-hidden"
       >
         {/* White Optical Sync Flash */}
         <AnimatePresence>
@@ -615,12 +682,25 @@ export function SlateModal({
                         onChange={(e) => setSelectedSceneId(e.target.value)}
                         className="w-full bg-black border border-neutral-700 text-white font-bold text-base rounded p-1.5 focus:outline-none focus:border-white"
                       >
-                        {sortedScenes.map((sc, i) => (
-                          <option key={sc.id} value={sc.id}>
-                            {i + 1}. {sc.title}
-                          </option>
-                        ))}
+                        {sortedScenes.length === 0 ? (
+                          <option value="">(Sin escenas creadas)</option>
+                        ) : (
+                          sortedScenes.map((sc, i) => (
+                            <option key={sc.id} value={sc.id}>
+                              {i + 1}. {sc.title}
+                            </option>
+                          ))
+                        )}
                       </select>
+                      {sortedScenes.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={ensureSceneAndShot}
+                          className="mt-1.5 w-full py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-amber-400 text-3xs font-bold transition-colors"
+                        >
+                          + Crear Escena 1
+                        </button>
+                      )}
                     </div>
 
                     {/* Shot Selection */}
@@ -664,6 +744,15 @@ export function SlateModal({
                           ))
                         )}
                       </select>
+                      {shots.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={ensureSceneAndShot}
+                          className="mt-1.5 w-full py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-emerald-400 text-3xs font-bold transition-colors"
+                        >
+                          + Crear Plano 1
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1018,6 +1107,7 @@ export function SlateModal({
           )}
         </AnimatePresence>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
