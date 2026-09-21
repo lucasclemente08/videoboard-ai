@@ -1,0 +1,53 @@
+import { pgTable, uuid, text, integer, real, jsonb, date, timestamp } from 'drizzle-orm/pg-core';
+import { projects } from './projects';
+import { users } from './users';
+
+export const scenes = pgTable('scenes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  project_id: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(),
+  description: text('description'),
+  objective: text('objective'),
+  estimated_duration_secs: integer('estimated_duration_secs').default(0).notNull(),
+  priority: text('priority').default('medium').notNull(),
+  status: text('status').default('draft').notNull(),
+  assigned_to: uuid('assigned_to').references(() => users.id),
+  due_date: date('due_date'),
+  color: text('color').default('#3B82F6').notNull(),
+  tags: text('tags').array(),
+  scene_type: text('scene_type'),
+  script_content: jsonb('script_content'),
+  narration_text: text('narration_text'),
+  narration_duration_secs: integer('narration_duration_secs'),
+  narration_speed: real('narration_speed').default(1.0).notNull(),
+  narration_language: text('narration_language').default('es').notNull(),
+  narrator: text('narrator'),
+  hook_type: text('hook_type'),
+  hook_text: text('hook_text'),
+  hook_location: text('hook_location').default('start').notNull(),
+  hook_duration_secs: integer('hook_duration_secs'),
+  storytelling_problem: text('storytelling_problem'),
+  storytelling_conflict: text('storytelling_conflict'),
+  storytelling_solution: text('storytelling_solution'),
+  storytelling_benefit: text('storytelling_benefit'),
+  storytelling_closing: text('storytelling_closing'),
+  emotion: text('emotion'),
+  position_x: real('position_x').default(0).notNull(),
+  position_y: real('position_y').default(0).notNull(),
+  width: real('width').default(320).notNull(),
+  height: real('height').default(200).notNull(),
+  sort_order: integer('sort_order').default(0).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const sceneConnections = pgTable('scene_connections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  project_id: uuid('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  source_scene_id: uuid('source_scene_id').references(() => scenes.id, { onDelete: 'cascade' }).notNull(),
+  target_scene_id: uuid('target_scene_id').references(() => scenes.id, { onDelete: 'cascade' }).notNull(),
+  connection_type: text('connection_type').default('sequence').notNull(),
+  label: text('label'),
+  transition_type: text('transition_type'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});

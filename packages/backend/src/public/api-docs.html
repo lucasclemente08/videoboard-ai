@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VideoBoard AI &#x2014; API Docs</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0b;
+    color: #e8e8ed;
+    min-height: 100vh;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+  header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    margin-bottom: 2.5rem;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  header h1 { font-size: 1.8rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
+  header h1 span { background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  header p { color: #a0a0b0; font-size: 0.9rem; }
+  .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin-top: 1rem; background: rgba(99,102,241,0.15); color: #a5b4fc; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2.5rem; }
+  .stat-card { background: #121214; border: 1px solid #1e1e22; border-radius: 12px; padding: 1.25rem; text-align: center; }
+  .stat-card .num { font-size: 1.8rem; font-weight: 700; color: #fff; }
+  .stat-card .label { font-size: 0.75rem; color: #6b6b7a; margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .resource { margin-bottom: 1.5rem; }
+  .resource-header {
+    display: flex; align-items: center;
+    padding: 1rem 1.25rem;
+    background: #121214;
+    border: 1px solid #1e1e22;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .resource-header:hover { border-color: #2e2e35; background: #161618; }
+  .resource-header .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; margin-right: 0.75rem; flex-shrink: 0; }
+  .resource-header h2 { font-size: 1rem; font-weight: 600; }
+  .resource-header .count { margin-left: auto; font-size: 0.75rem; color: #6b6b7a; background: #1a1a1e; padding: 0.2rem 0.6rem; border-radius: 999px; }
+  .resource-header .arrow { margin-left: 0.75rem; color: #6b6b7a; font-size: 0.8rem; transition: transform 0.2s; }
+  .resource-header.open .arrow { transform: rotate(180deg); }
+  .resource-body { display: none; }
+  .resource-body.open { display: block; }
+  .endpoint { padding: 1rem 1.25rem; margin-left: 1rem; border-left: 2px solid #1e1e22; transition: border-color 0.15s; }
+  .endpoint:hover { border-left-color: #6366f1; }
+  .endpoint-row { display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+  .method {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0.2rem 0.55rem; border-radius: 6px;
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; min-width: 52px; height: 22px;
+  }
+  .method.get { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .method.post { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .method.patch { background: rgba(234,179,8,0.15); color: #facc15; }
+  .method.delete { background: rgba(239,68,68,0.15); color: #f87171; }
+  .path { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82rem; color: #d4d4e0; word-break: break-all; flex: 1; padding-top: 0.1rem; }
+  .auth-badge { font-size: 0.65rem; color: #6b6b7a; background: #1a1a1e; padding: 0.15rem 0.45rem; border-radius: 4px; }
+  .description { font-size: 0.82rem; color: #8888a0; margin-top: 0.4rem; margin-left: calc(52px + 1rem); }
+  .params { margin-top: 0.5rem; }
+  .params summary { cursor: pointer; font-size: 0.75rem; color: #6b6b7a; }
+  .params summary:hover { color: #a0a0b0; }
+  .params table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.78rem; }
+  .params th { text-align: left; color: #6b6b7a; padding: 0.3rem 0.5rem; border-bottom: 1px solid #1e1e22; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; font-size: 0.7rem; }
+  .params td { padding: 0.3rem 0.5rem; border-bottom: 1px solid #1a1a1e; color: #b0b0c0; }
+  .params td:first-child { font-family: 'SF Mono', monospace; color: #e0e0f0; }
+  .param-required { color: #f87171; font-size: 0.7rem; }
+  .param-type { color: #60a5fa; font-size: 0.7rem; }
+  pre { background: #0d0d0f; border: 1px solid #1a1a1e; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.78rem; overflow-x: auto; margin-top: 0.5rem; color: #c0c0d0; }
+  code { font-family: 'SF Mono', 'Fira Code', monospace; }
+  @media (max-width: 640px) {
+    .container { padding: 1rem; }
+    header { padding: 1.5rem; }
+    header h1 { font-size: 1.3rem; }
+    .endpoint { margin-left: 0.5rem; padding: 0.75rem; }
+    .endpoint-row { gap: 0.5rem; }
+    .description { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><span>VideoBoard</span> AI</h1>
+    <p>API REST para preproduccion audiovisual colaborativa</p>
+    <div class="badge">v1.0.0 &#x2022; 11 recursos &#x2022; 35+ endpoints</div>
+  </header>
+
+  <div class="stats">
+    <div class="stat-card"><div class="num" id="total-endpoints">&#x2014;</div><div class="label">Endpoints</div></div>
+    <div class="stat-card"><div class="num" id="total-resources">&#x2014;</div><div class="label">Recursos</div></div>
+    <div class="stat-card"><div class="num" id="total-auth">&#x2014;</div><div class="label">Con Auth</div></div>
+    <div class="stat-card"><div class="num">&#x2699;&#xFE0F;</div><div class="label">Estado OK</div></div>
+  </div>
+
+  <div id="resources"></div>
+</div>
+<script>
+const docs = [
+  { icon: '\u{1F49A}', color: '#22c55e', name: 'Health', base: '/api/health', endpoints: [
+    { m: 'GET', p: '/api/health', auth: false, d: 'Verificar que el servidor esta vivo', r: '{status: &quot;ok&quot;, timestamp: &quot;ISO&quot;}' }
+  ]},
+  { icon: '\u{1F510}', color: '#6366f1', name: 'Auth', base: '/api/auth', endpoints: [
+    { m: 'GET', p: '/api/auth/me', auth: true, d: 'Obtener perfil del usuario autenticado', r: '{ data: User, error: null }', pp: [
+      { n: 'N/A', t: '-', r: false, de: 'Header Authorization: Bearer &lt;token&gt;' }
+    ]},
+    { m: 'POST', p: '/api/auth/register', auth: true, d: 'Registrar usuario (tras Supabase signup)', r: '{ data: User, error: null }', pp: [
+      { n: 'full_name', t: 'string', r: false, de: 'Nombre completo del usuario' }
+    ]}
+  ]},
+  { icon: '\u{1F4C1}', color: '#f59e0b', name: 'Proyectos', base: '/api/projects', endpoints: [
+    { m: 'GET', p: '/api/projects', auth: true, d: 'Listar todos los proyectos', r: '{ data: Project[], error: null }', pp: [] },
+    { m: 'POST', p: '/api/projects', auth: true, d: 'Crear proyecto', r: '{ data: Project, error: null }', pp: [
+      { n: 'title', t: 'string', r: true, de: 'Titulo del proyecto' },
+      { n: 'description', t: 'string', r: false, de: 'Descripcion opcional' }
+    ]},
+    { m: 'GET', p: '/api/projects/:id', auth: true, d: 'Obtener proyecto por ID', r: '{ data: Project, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: 'ID del proyecto (path param)' }] },
+    { m: 'PATCH', p: '/api/projects/:id', auth: true, d: 'Actualizar proyecto', r: '{ data: Project, error: null }', pp: [
+      { n: ':id', t: 'uuid', r: true, de: '(path)' },
+      { n: 'title', t: 'string', r: false },
+      { n: 'description', t: 'string', r: false }
+    ]},
+    { m: 'DELETE', p: '/api/projects/:id', auth: true, d: 'Eliminar proyecto', r: '{ data: { deleted: true }, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: '(path)' }] }
+  ]},
+  { icon: '\u{1F3AC}', color: '#3b82f6', name: 'Escenas', base: '/api/scenes', endpoints: [
+    { m: 'GET', p: '/api/scenes?project_id=', auth: true, d: 'Listar escenas de un proyecto', r: '{ data: Scene[], error: null }', pp: [{ n: 'project_id', t: 'uuid', r: true, de: 'Query param' }] },
+    { m: 'GET', p: '/api/scenes/:id', auth: true, d: 'Obtener escena por ID', r: '{ data: Scene, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: 'Path param' }] },
+    { m: 'POST', p: '/api/scenes', auth: true, d: 'Crear escena', r: '{ data: Scene, error: null }', pp: [
+      { n: 'project_id', t: 'uuid', r: true },
+      { n: 'title', t: 'string', r: false, de: 'Default: Nueva escena' },
+      { n: 'description', t: 'string', r: false },
+      { n: 'position_x', t: 'number', r: false },
+      { n: 'position_y', t: 'number', r: false }
+    ]},
+    { m: 'PATCH', p: '/api/scenes/:id', auth: true, d: 'Actualizar escena', r: '{ data: Scene, error: null }', pp: [
+      { n: ':id', t: 'uuid', r: true, de: 'Path' },
+      { n: 'title', t: 'string', r: false },
+      { n: 'description', t: 'string', r: false },
+      { n: 'estimated_duration_secs', t: 'number', r: false },
+      { n: 'status', t: 'string', r: false },
+      { n: 'color', t: 'string', r: false },
+      { n: 'position_x', t: 'number', r: false },
+      { n: 'position_y', t: 'number', r: false }
+    ]},
+    { m: 'DELETE', p: '/api/scenes/:id', auth: true, d: 'Eliminar escena', r: '{ data: { deleted: true }, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: 'Path param' }] },
+    { m: 'POST', p: '/api/scenes/reorder', auth: true, d: 'Reordenar escenas en lote', r: '{ data: { reordered: true }, error: null }', pp: [{ n: 'scene_ids', t: 'string[]', r: true, de: 'Array de IDs en nuevo orden' }] },
+    { m: 'GET', p: '/api/scenes/:id/connections', auth: true, d: 'Obtener conexiones de una escena', r: '{ data: SceneConnection[], error: null }' },
+    { m: 'POST', p: '/api/scenes/:id/connections', auth: true, d: 'Conectar escenas', r: '{ data: SceneConnection, error: null }' },
+    { m: 'DELETE', p: '/api/scenes/connections/:id', auth: true, d: 'Eliminar conexion entre escenas', r: '{ data: { deleted: true }, error: null }' }
+  ]},
+  { icon: '\u{1F4FD}', color: '#8b5cf6', name: 'Shots / Planos', base: '/api/shots', endpoints: [
+    { m: 'GET', p: '/api/shots?scene_id=', auth: true, d: 'Listar shots de una escena', r: '{ data: Shot[], error: null }', pp: [{ n: 'scene_id', t: 'uuid', r: true, de: 'Query param' }] },
+    { m: 'GET', p: '/api/shots/:id', auth: true, d: 'Obtener shot por ID', r: '{ data: Shot, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: 'Path param' }] },
+    { m: 'POST', p: '/api/shots', auth: true, d: 'Crear shot', r: '{ data: Shot, error: null }', pp: [
+      { n: 'scene_id', t: 'uuid', r: true },
+      { n: 'shot_type', t: 'string', r: false, de: 'Primer plano, General...' },
+      { n: 'angle', t: 'string', r: false, de: 'Normal, Picado...' },
+      { n: 'movement', t: 'string', r: false, de: 'Fijo, Traveling...' },
+      { n: 'script_text', t: 'string', r: false }
+    ]},
+    { m: 'PATCH', p: '/api/shots/:id', auth: true, d: 'Actualizar shot', r: '{ data: Shot, error: null }', pp: [
+      { n: ':id', t: 'uuid', r: true, de: 'Path' },
+      { n: 'shot_type', t: 'string', r: false },
+      { n: 'angle', t: 'string', r: false },
+      { n: 'movement', t: 'string', r: false },
+      { n: 'lens', t: 'string', r: false },
+      { n: 'framing', t: 'string', r: false }
+    ]},
+    { m: 'DELETE', p: '/api/shots/:id', auth: true, d: 'Eliminar shot', r: '{ data: { deleted: true }, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: 'Path param' }] }
+  ]},
+  { icon: '\u{1F5BC}', color: '#06b6d4', name: 'Assets / Referencias', base: '/api/assets', endpoints: [
+    { m: 'GET', p: '/api/assets?project_id=', auth: true, d: 'Listar assets por proyecto', r: '{ data: Asset[], error: null }', pp: [
+      { n: 'project_id', t: 'uuid', r: true, de: 'Query' },
+      { n: 'type', t: 'string', r: false, de: 'Filtrar: image, video, link, note' }
+    ]},
+    { m: 'POST', p: '/api/assets', auth: true, d: 'Crear asset', r: '{ data: Asset, error: null }', pp: [
+      { n: 'project_id', t: 'uuid', r: true },
+      { n: 'type', t: 'string', r: true, de: 'image | video | link | note' },
+      { n: 'url', t: 'string', r: false },
+      { n: 'title', t: 'string', r: false }
+    ]},
+    { m: 'DELETE', p: '/api/assets/:id', auth: true, d: 'Eliminar asset', r: '{ data: { deleted: true }, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: 'Path param' }] }
+  ]},
+  { icon: '\u{1F464}', color: '#ec4899', name: 'Personajes', base: '/api/characters', endpoints: [
+    { m: 'GET', p: '/api/characters?project_id=', auth: true, d: 'Listar personajes de un proyecto', r: '{ data: Character[], error: null }', pp: [{ n: 'project_id', t: 'uuid', r: true, de: 'Query' }] },
+    { m: 'POST', p: '/api/characters', auth: true, d: 'Crear personaje', r: '{ data: Character, error: null }', pp: [
+      { n: 'project_id', t: 'uuid', r: true },
+      { n: 'name', t: 'string', r: true },
+      { n: 'actor', t: 'string', r: false },
+      { n: 'description', t: 'string', r: false }
+    ]},
+    { m: 'PATCH', p: '/api/characters/:id', auth: true, d: 'Actualizar personaje', r: '{ data: Character, error: null }', pp: [
+      { n: ':id', t: 'uuid', r: true, de: 'Path' },
+      { n: 'name', t: 'string', r: false },
+      { n: 'actor', t: 'string', r: false },
+      { n: 'wardrobe', t: 'string', r: false }
+    ]},
+    { m: 'DELETE', p: '/api/characters/:id', auth: true, d: 'Eliminar personaje', r: '{ data: { deleted: true }, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: 'Path param' }] }
+  ]},
+  { icon: '\u{1F3B5}', color: '#22d3ee', name: 'Musica / Sonido', base: '/api/music', endpoints: [
+    { m: 'GET', p: '/api/music?project_id=', auth: true, d: 'Listar pistas por proyecto', r: '{ data: MusicTrack[], error: null }', pp: [{ n: 'project_id', t: 'uuid', r: true, de: 'Query' }] },
+    { m: 'POST', p: '/api/music', auth: true, d: 'Agregar pista musical', r: '{ data: MusicTrack, error: null }', pp: [
+      { n: 'project_id', t: 'uuid', r: true },
+      { n: 'title', t: 'string', r: true },
+      { n: 'artist', t: 'string', r: false },
+      { n: 'url', t: 'string', r: false },
+      { n: 'mood', t: 'string', r: false, de: 'Ej: tensa, alegre, melancolica' }
+    ]},
+    { m: 'DELETE', p: '/api/music/:id', auth: true, d: 'Eliminar pista', r: '{ data: { deleted: true }, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: 'Path param' }] }
+  ]},
+  { icon: '\u{1F4AC}', color: '#a78bfa', name: 'Comentarios', base: '/api/comments', endpoints: [
+    { m: 'GET', p: '/api/comments?scene_id=', auth: true, d: 'Listar comentarios de escena', r: '{ data: Comment[], error: null }', pp: [{ n: 'scene_id', t: 'uuid', r: true, de: 'Query' }] },
+    { m: 'POST', p: '/api/comments', auth: true, d: 'Crear comentario', r: '{ data: Comment, error: null }', pp: [
+      { n: 'scene_id', t: 'uuid', r: true },
+      { n: 'content', t: 'string', r: true },
+      { n: 'parent_id', t: 'uuid', r: false, de: 'Responder a comentario' }
+    ]},
+    { m: 'DELETE', p: '/api/comments/:id', auth: true, d: 'Eliminar comentario', r: '{ data: { deleted: true }, error: null }', pp: [{ n: ':id', t: 'uuid', r: true, de: 'Path param' }] }
+  ]},
+  { icon: '\u{1F916}', color: '#22c55e', name: 'IA Premium', base: '/api/ai', endpoints: [
+    { m: 'GET', p: '/api/ai/providers', auth: false, d: 'Listar proveedores IA configurados', r: '{ data: [{ type, hasKey, defaultModel }], error: null }', pp: [] },
+    { m: 'POST', p: '/api/ai/chat', auth: true, d: 'Chat streaming SSE', r: 'text/plain chunked (SSE)', pp: [
+      { n: 'message', t: 'string', r: true, de: 'Mensaje del usuario' },
+      { n: 'projectId', t: 'uuid', r: true },
+      { n: 'sceneId', t: 'uuid', r: false, de: 'Escena seleccionada' },
+      { n: 'history', t: 'AIMessage[]', r: false },
+      { n: 'provider', t: 'string', r: false, de: 'openai/anthropic/gemini/openrouter/ollama' }
+    ]},
+    { m: 'POST', p: '/api/ai/generate-project', auth: true, d: 'Generar proyecto desde idea', r: '{ data: string, error: null }', pp: [
+      { n: 'idea', t: 'string', r: true, de: 'Descripcion creativa' },
+      { n: 'projectId', t: 'uuid', r: true }
+    ]},
+    { m: 'POST', p: '/api/ai/analyze-scene', auth: true, d: 'Analizar ritmo y emocion', r: '{ data: string, error: null }', pp: [
+      { n: 'projectId', t: 'uuid', r: true },
+      { n: 'sceneId', t: 'uuid', r: true }
+    ]},
+    { m: 'POST', p: '/api/ai/optimize-for-platform', auth: true, d: 'Adaptar guion a formato', r: '{ data: string, error: null }', pp: [
+      { n: 'projectId', t: 'uuid', r: true },
+      { n: 'platform', t: 'string', r: true, de: 'TikTok/YouTube/Instagram' }
+    ]}
+  ]},
+  { icon: '\u{1F4E6}', color: '#f97316', name: 'Exportacion', base: '/api/export', endpoints: [
+    { m: 'POST', p: '/api/export/pdf?project_id=', auth: true, d: 'Exportar storyboard como PDF', r: 'application/pdf (binary)', pp: [{ n: 'project_id', t: 'uuid', r: true, de: 'Query param' }] },
+    { m: 'POST', p: '/api/export/csv?project_id=', auth: true, d: 'Exportar shot list como CSV', r: 'text/csv (binary)', pp: [{ n: 'project_id', t: 'uuid', r: true, de: 'Query param' }] }
+  ]}
+];
+
+var container = document.getElementById('resources');
+var totalEP = 0;
+var totalAuth = 0;
+
+docs.forEach(function(res) {
+  totalEP += res.endpoints.length;
+  res.endpoints.forEach(function(e) { if (e.auth) totalAuth++; });
+
+  var div = document.createElement('div');
+  div.className = 'resource';
+
+  var header = document.createElement('div');
+  header.className = 'resource-header';
+  var epLabel = res.endpoints.length === 1 ? 'endpoint' : 'endpoints';
+  header.innerHTML = '<div class="icon" style="background:' + res.color + '20;color:' + res.color + '">' + res.icon + '</div><h2>' + res.name + '</h2><span class="count">' + res.endpoints.length + ' ' + epLabel + '</span><span class="arrow">\u25BC</span>';
+  
+  var body = document.createElement('div');
+  body.className = 'resource-body';
+
+  var html = '';
+  res.endpoints.forEach(function(ep) {
+    var ppHtml = '';
+    if (ep.pp && ep.pp.length > 0) {
+      ppHtml = '<details class="params"><summary>Parametros</summary><table><thead><tr><th>Campo</th><th>Tipo</th><th>Req</th><th>Desc</th></tr></thead><tbody>';
+      ep.pp.forEach(function(p) {
+        ppHtml += '<tr><td>' + p.n + '</td><td><span class="param-type">' + p.t + '</span></td><td>' + (p.r ? '<span class="param-required">Si</span>' : 'No') + '</td><td>' + (p.de || '') + '</td></tr>';
+      });
+      ppHtml += '</tbody></table></details>';
+    }
+    var authBadge = ep.auth ? '<span class="auth-badge">Auth</span>' : '<span class="auth-badge">Publico</span>';
+    html += '<div class="endpoint"><div class="endpoint-row"><span class="method ' + ep.m.toLowerCase() + '">' + ep.m + '</span><span class="path">' + ep.p + '</span>' + authBadge + '</div><div class="description">' + ep.d + '</div>' + ppHtml + '<pre><code>' + ep.r + '</code></pre></div>';
+  });
+  body.innerHTML = html;
+
+  header.addEventListener('click', function() {
+    body.classList.toggle('open');
+    header.classList.toggle('open');
+  });
+
+  div.appendChild(header);
+  div.appendChild(body);
+  container.appendChild(div);
+});
+
+document.getElementById('total-endpoints').textContent = totalEP;
+document.getElementById('total-resources').textContent = docs.length;
+document.getElementById('total-auth').textContent = totalAuth;
+</script>
+</body>
+</html>

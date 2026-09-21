@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Light Mode (default) ---- */
+:root {
+  --color-surface: 255 255 255;
+  --color-surface-raised: 249 250 251;
+  --color-surface-overlay: 243 244 246;
+  --color-surface-edge: 229 231 235;
+  --color-surface-hover: 243 244 246;
+  --color-text-primary: 17 24 39;
+  --color-text-secondary: 107 114 128;
+  --color-text-muted: 156 163 175;
+}
+
+/* ---- Dark Mode ---- */
+.dark {
+  --color-surface: 10 10 11;
+  --color-surface-raised: 20 20 22;
+  --color-surface-overlay: 26 26 29;
+  --color-surface-edge: 31 31 35;
+  --color-surface-hover: 37 37 41;
+  --color-text-primary: 250 250 250;
+  --color-text-secondary: 161 161 170;
+  --color-text-muted: 113 113 122;
+}
+
+@layer base {
+  * {
+    @apply border-surface-edge;
+  }
+
+  body {
+    @apply bg-surface text-text-primary;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-text-muted/20 rounded; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-text-muted/40; }
+
+  .react-flow__background { @apply !bg-surface; }
+  .react-flow__controls {
+    @apply bg-surface-raised border border-surface-edge rounded-xl overflow-hidden shadow-xl;
+  }
+  .react-flow__controls-button {
+    @apply bg-surface-raised text-text-secondary hover:bg-surface-hover border-b border-surface-edge;
+    width: 32px !important; height: 32px !important;
+  }
+  .react-flow__minimap {
+    @apply bg-surface-raised border border-surface-edge rounded-xl overflow-hidden shadow-xl;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-surface-raised/80 backdrop-blur-xl border border-surface-edge;
+  }
+}
