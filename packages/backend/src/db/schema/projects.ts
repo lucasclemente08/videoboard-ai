@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, boolean } from 'drizzle-orm/pg-core';
 import { users } from './users';
 
 export const projects = pgTable('projects', {
@@ -9,6 +9,13 @@ export const projects = pgTable('projects', {
   status: text('status').default('draft').notNull(),
   owner_id: uuid('owner_id').references(() => users.id),
   estimated_duration_secs: integer('estimated_duration_secs').default(0).notNull(),
+  is_template: boolean('is_template').default(false).notNull(),
+  template_category: text('template_category'),
+  clone_count: integer('clone_count').default(0).notNull(),
+  share_token: text('share_token'),
+  share_password: text('share_password'),
+  client_approved: boolean('client_approved').default(false).notNull(),
+  client_feedback: text('client_feedback'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

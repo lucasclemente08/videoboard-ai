@@ -8,6 +8,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { PremiumModal } from '../premium/PremiumModal';
 import { AnimaticModal } from '../animatic/AnimaticModal';
 import { SlateModal } from '../slate/SlateModal';
+import { ShareModal } from '../collaboration/ShareModal';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
@@ -27,6 +28,7 @@ export function TopBar() {
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [animaticOpen, setAnimaticOpen] = useState(false);
   const [slateOpen, setSlateOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const premiumActive = user?.isPremium || false;
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -152,21 +154,12 @@ export function TopBar() {
             </div>
             <div className="h-5 w-px bg-surface-edge mx-1" />
             <button
-              onClick={handleShare}
-              className={clsx(
-                'px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5',
-                copied ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-blue text-white hover:bg-accent-blue/90'
-              )}
+              onClick={() => setShareOpen(true)}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-accent-blue text-white hover:bg-accent-blue/90 transition-all flex items-center gap-1.5 shadow-sm"
+              title="Compartir enlace con cliente o publicar plantilla"
             >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5" /> Copiado
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-3.5 h-3.5" /> Compartir
-                </>
-              )}
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Compartir</span>
             </button>
           </>
         )}
@@ -250,6 +243,12 @@ export function TopBar() {
             projectId={projectId}
             projectTitle={currentProject?.title}
             scenes={scenes || []}
+          />
+          <ShareModal
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            projectId={projectId}
+            projectTitle={currentProject?.title}
           />
         </>
       )}

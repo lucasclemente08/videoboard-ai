@@ -4,6 +4,8 @@ import { AppShell } from './components/layout/AppShell';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import { ProjectView } from './pages/ProjectView';
+import { TemplatesView } from './pages/TemplatesView';
+import { ClientShareView } from './pages/ClientShareView';
 import { useAuthStore } from './stores/useAuthStore';
 import { motion } from 'framer-motion';
 import { Film, Loader2 } from 'lucide-react';
@@ -68,8 +70,10 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/share/:token" element={<ClientShareView />} />
       <Route element={<AuthGuard><AppShell /></AuthGuard>}>
         <Route path="/" element={<Home />} />
+        <Route path="/templates" element={<TemplatesView />} />
         <Route path="/project/:id" element={<ProjectView />} />
       </Route>
     </Routes>

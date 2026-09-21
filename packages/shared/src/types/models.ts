@@ -19,6 +19,13 @@ export interface Project {
   status: ProjectStatus;
   owner_id: string;
   estimated_duration_secs: number;
+  is_template?: boolean;
+  template_category?: string | null;
+  clone_count?: number;
+  share_token?: string | null;
+  share_password?: string | null;
+  client_approved?: boolean;
+  client_feedback?: string | null;
   created_at: string;
   updated_at: string;
 }

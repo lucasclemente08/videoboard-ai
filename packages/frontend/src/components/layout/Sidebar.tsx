@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Film, Layout, Calendar, Columns, Sparkles, Library, Settings, ChevronLeft, Plus, Home, BarChart3, Heart, Activity, LogOut, User, Crown, Clapperboard, ListChecks } from 'lucide-react';
+import { Film, Layout, Calendar, Columns, Sparkles, Library, Settings, ChevronLeft, Plus, Home, BarChart3, Heart, Activity, LogOut, User, Crown, Clapperboard, ListChecks, Compass } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -118,6 +118,19 @@ export function Sidebar() {
 
         {/* Bottom actions */}
         <div className="p-2 border-t border-surface-edge space-y-0.5">
+          <button
+            onClick={() => navigate('/templates')}
+            className={clsx(
+              'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+              location.pathname === '/templates'
+                ? 'bg-accent-blue/10 text-accent-blue font-medium'
+                : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+            )}
+          >
+            <Compass className="w-4 h-4 text-accent-blue" />
+            <span className="flex-1 text-left">Plantillas</span>
+            <span className="text-2xs px-1.5 py-0.5 rounded-full bg-accent-blue/15 text-accent-blue font-semibold">Hub</span>
+          </button>
           <button
             onClick={() => setShowLibrary(!showLibrary)}
             className={clsx(

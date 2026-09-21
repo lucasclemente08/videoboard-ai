@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Film, Clock, Trash2, FolderGit2 } from 'lucide-react';
+import { Plus, Film, Clock, Trash2, FolderGit2, Compass, Sparkles } from 'lucide-react';
 import { useProjects, useCreateProject, useDeleteProject } from '../api/hooks';
 import { useProjectStore } from '../stores/useProjectStore';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -49,13 +49,22 @@ export function Home() {
             </h1>
             <p className="text-xs text-text-muted mt-0.5">Tus proyectos audiovisuales</p>
           </div>
-          <button
-            onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/90 transition-all shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo proyecto
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/templates')}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-surface-raised border border-surface-edge text-text-primary rounded-xl text-xs font-semibold hover:border-accent-blue/50 hover:bg-surface-hover transition-all shadow-xs"
+            >
+              <Compass className="w-4 h-4 text-accent-blue" />
+              Explorar Plantillas
+            </button>
+            <button
+              onClick={() => setShowNewModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-accent-blue text-white rounded-xl text-xs font-semibold hover:bg-accent-blue/90 transition-all shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo proyecto
+            </button>
+          </div>
         </div>
 
         {/* Skeletons while loading */}
@@ -107,12 +116,20 @@ export function Home() {
             <p className="text-xs text-text-muted mt-1.5 mb-6 max-w-sm mx-auto leading-relaxed">
               Crea un proyecto para estructurar escenas, tomas de cámara, elenco y sincronizar en tiempo real con tu equipo.
             </p>
-            <button
-              onClick={() => setShowNewModal(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-blue text-white text-xs font-semibold rounded-xl hover:bg-accent-blue-hover transition-all shadow-md"
-            >
-              <Plus className="w-4 h-4" /> Crear mi primer proyecto
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => setShowNewModal(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-blue text-white text-xs font-semibold rounded-xl hover:bg-accent-blue-hover transition-all shadow-md"
+              >
+                <Plus className="w-4 h-4" /> Crear desde cero
+              </button>
+              <button
+                onClick={() => navigate('/templates')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface border border-surface-edge text-text-primary text-xs font-semibold rounded-xl hover:border-accent-blue/50 transition-all"
+              >
+                <Sparkles className="w-4 h-4 text-accent-blue" /> Usar Plantilla
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -15,6 +15,8 @@ import { aiRouter } from './routes/ai';
 import { exportRouter } from './routes/export';
 import { premiumRouter } from './routes/premium';
 import { presetsRouter } from './routes/presets';
+import { templatesRouter } from './routes/templates';
+import { shareRouter } from './routes/share';
 import { apiDocsRoute } from './routes/docs';
 
 export function createApp() {
@@ -55,6 +57,8 @@ export function createApp() {
   app.use('/api/export', exportRouter);
   app.use('/api/premium', premiumRouter);
   app.use('/api/presets', presetsRouter);
+  app.use('/api/templates', templatesRouter);
+  app.use('/api/share', shareRouter);
 
   app.use(notFound);
   app.use(errorHandler);
