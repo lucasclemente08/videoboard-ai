@@ -11,4 +11,9 @@ export const env = {
   SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || '',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+  STRIPE_PRICE_MONTHLY: process.env.STRIPE_PRICE_MONTHLY || '',
+  STRIPE_PRICE_YEARLY: process.env.STRIPE_PRICE_YEARLY || '',
+  CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
 };
