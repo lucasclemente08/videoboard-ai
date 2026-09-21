@@ -6,9 +6,17 @@ import { eq, desc } from '../config/database';
 import { db } from '../config/database';
 import { assets } from '../db/schema/assets';
 import { authMiddleware, type AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/projectAccess';
 
 export const assetsRouter = Router();
 assetsRouter.use(authMiddleware);
+
+const ALLOWED_EXTENSIONS = new Set([
+  '.jpg', '.jpeg', '.png', '.webp', '.gif',
+  '.mp4', '.webm', '.mov',
+  '.mp3', '.wav', '.ogg',
+  '.pdf', '.txt', '.csv', '.json',
+]);
 
 // POST /api/assets/upload
 assetsRouter.post('/upload', async (req: AuthRequest, res) => {
@@ -17,6 +25,14 @@ assetsRouter.post('/upload', async (req: AuthRequest, res) => {
     if (!fileName || !fileData) {
       res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'fileName y fileData son requeridos' } });
       return;
+    }
+
+    if (projectId) {
+      const hasAccess = await hasProjectAccess(projectId, req.userId);
+      if (!hasAccess) {
+        res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para subir archivos a este proyecto' } });
+        return;
+      }
     }
 
     const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -35,8 +51,32 @@ assetsRouter.post('/upload', async (req: AuthRequest, res) => {
       if (match) detectedMime = match[1];
     }
 
+    // File extension verification
+    const ext = path.extname(fileName).toLowerCase();
+    if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+      res.status(400).json({
+        data: null,
+        error: {
+          code: 'INVALID_FILE_TYPE',
+          message: 'Tipo de archivo no permitido. Formatos aceptados: fotos (JPG, PNG, WebP), videos (MP4, WebM, MOV), audios (MP3, WAV) y documentos (PDF, CSV, TXT).',
+        },
+      });
+      return;
+    }
+
     const buffer = Buffer.from(base64Payload, 'base64');
-    const ext = path.extname(fileName) || (detectedMime.includes('image') ? '.jpg' : detectedMime.includes('video') ? '.mp4' : detectedMime.includes('audio') ? '.mp3' : '.bin');
+    const MAX_FILE_SIZE = req.isPremium ? 50 * 1024 * 1024 : 25 * 1024 * 1024;
+    if (buffer.length > MAX_FILE_SIZE) {
+      res.status(400).json({
+        data: null,
+        error: {
+          code: 'FILE_TOO_LARGE',
+          message: `El archivo supera el tamaño máximo permitido (${req.isPremium ? '50MB' : '25MB'}).`,
+        },
+      });
+      return;
+    }
+
     const safeBaseName = path.basename(fileName, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
     const uniqueFileName = `${Date.now()}_${uuidv4().slice(0, 8)}_${safeBaseName}${ext}`;
     const filePath = path.join(uploadsDir, uniqueFileName);
@@ -116,6 +156,13 @@ assetsRouter.get('/', async (req: AuthRequest, res) => {
       res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'project_id es requerido' } });
       return;
     }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para ver los archivos de este proyecto' } });
+      return;
+    }
+
     const rows = await db.select().from(assets)
       .where(eq(assets.project_id, projectId))
       .orderBy(desc(assets.created_at));
@@ -128,6 +175,14 @@ assetsRouter.get('/', async (req: AuthRequest, res) => {
 // POST /api/assets
 assetsRouter.post('/', async (req: AuthRequest, res) => {
   try {
+    if (req.body.project_id) {
+      const hasAccess = await hasProjectAccess(req.body.project_id, req.userId);
+      if (!hasAccess) {
+        res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para agregar archivos a este proyecto' } });
+        return;
+      }
+    }
+
     const [asset] = await db.insert(assets).values({
       project_id: req.body.project_id,
       scene_id: req.body.scene_id || null,
@@ -150,6 +205,15 @@ assetsRouter.post('/', async (req: AuthRequest, res) => {
 // DELETE /api/assets/:id
 assetsRouter.delete('/:id', async (req: AuthRequest, res) => {
   try {
+    const rows = await db.select().from(assets).where(eq(assets.id, req.params.id));
+    if (rows.length > 0 && rows[0].project_id) {
+      const hasAccess = await hasProjectAccess(rows[0].project_id, req.userId);
+      if (!hasAccess) {
+        res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para eliminar este archivo' } });
+        return;
+      }
+    }
+
     await db.delete(assets).where(eq(assets.id, req.params.id));
     res.json({ data: { deleted: true }, error: null });
   } catch (err) {

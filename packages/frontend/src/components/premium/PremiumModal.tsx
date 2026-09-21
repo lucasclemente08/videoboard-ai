@@ -137,7 +137,7 @@ export function PremiumModal({ open, onClose, currentToken }: Props) {
                   {activating ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Activando...</>
                   ) : (
-                    <><Zap className="w-4 h-4" /> Activar Premium — $9.99/mes</>
+                    <><Zap className="w-4 h-4" /> Activar Creador Pro — $4.99/mes</>
                   )}
                 </button>
               )}

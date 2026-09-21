@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { eq, desc } from '../config/database';
 import { db } from '../config/database';
 import { comments, versions, templates, productionChecklist } from '../db/schema/comments';
-import { authMiddleware, type AuthRequest } from '../middleware/auth';
+import { authMiddleware, premiumMiddleware, type AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/projectAccess';
 
 export const commentsRouter = Router();
 commentsRouter.use(authMiddleware);
@@ -83,7 +84,7 @@ commentsRouter.get('/versions', async (req: AuthRequest, res) => {
   }
 });
 
-commentsRouter.post('/versions', async (req: AuthRequest, res) => {
+commentsRouter.post('/versions', premiumMiddleware, async (req: AuthRequest, res) => {
   try {
     const [version] = await db.insert(versions).values({
       project_id: req.body.project_id,

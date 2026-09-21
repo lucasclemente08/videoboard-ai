@@ -6,11 +6,12 @@ import { scenes, sceneConnections } from '../db/schema/scenes';
 import { shots } from '../db/schema/shots';
 import { budgetItems } from '../db/schema/comments';
 import { authMiddleware, type AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/projectAccess';
 
 export const projectsRouter = Router();
 projectsRouter.use(authMiddleware);
 
-const MAX_FREE_PROJECTS = 10; // Generous limit for development & demo
+const MAX_FREE_PROJECTS = 3; // Free tier allows up to 3 projects
 
 // GET /api/projects
 projectsRouter.get('/', async (req: AuthRequest, res) => {
@@ -57,7 +58,7 @@ projectsRouter.post('/', async (req: AuthRequest, res) => {
         data: null,
         error: {
           code: 'FREE_LIMIT_REACHED',
-          message: `Has alcanzado el límite de ${MAX_FREE_PROJECTS} proyectos en el plan Free. Actualizá a Premium para crear proyectos ilimitados.`,
+          message: `Has alcanzado el límite de ${MAX_FREE_PROJECTS} proyectos en el plan Free. Actualizá a Creador Pro ($4.99/mes) para crear proyectos ilimitados.`,
           upgradeRequired: true,
         },
       });
@@ -90,6 +91,13 @@ projectsRouter.get('/:id', async (req: AuthRequest, res) => {
       res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Proyecto no encontrado' } });
       return;
     }
+
+    const hasAccess = await hasProjectAccess(req.params.id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para acceder a este proyecto' } });
+      return;
+    }
+
     res.json({ data: rows[0], error: null });
   } catch (err) {
     res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
@@ -99,6 +107,12 @@ projectsRouter.get('/:id', async (req: AuthRequest, res) => {
 // PATCH /api/projects/:id
 projectsRouter.patch('/:id', async (req: AuthRequest, res) => {
   try {
+    const hasAccess = await hasProjectAccess(req.params.id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para modificar este proyecto' } });
+      return;
+    }
+
     const updated = await db.update(projects).set({ ...req.body, updated_at: new Date() }).where(eq(projects.id, req.params.id)).returning();
     if (updated.length === 0) {
       res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Proyecto no encontrado' } });
@@ -116,6 +130,12 @@ projectsRouter.delete('/:id', async (req: AuthRequest, res) => {
     const rows = await db.select().from(projects).where(eq(projects.id, req.params.id));
     if (rows.length === 0) {
       res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Proyecto no encontrado' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(req.params.id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para eliminar este proyecto' } });
       return;
     }
 
@@ -137,6 +157,11 @@ projectsRouter.delete('/:id', async (req: AuthRequest, res) => {
 // GET /api/projects/:id/budget
 projectsRouter.get('/:id/budget', async (req: AuthRequest, res) => {
   try {
+    const hasAccess = await hasProjectAccess(req.params.id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para ver el presupuesto de este proyecto' } });
+      return;
+    }
     const rows = await db.select().from(budgetItems).where(eq(budgetItems.project_id, req.params.id));
     res.json({ data: rows, error: null });
   } catch (err) {
@@ -147,6 +172,11 @@ projectsRouter.get('/:id/budget', async (req: AuthRequest, res) => {
 // POST /api/projects/:id/budget
 projectsRouter.post('/:id/budget', async (req: AuthRequest, res) => {
   try {
+    const hasAccess = await hasProjectAccess(req.params.id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para agregar ítems a este presupuesto' } });
+      return;
+    }
     const [item] = await db.insert(budgetItems).values({
       project_id: req.params.id,
       category: req.body.category || 'General',
@@ -164,6 +194,11 @@ projectsRouter.post('/:id/budget', async (req: AuthRequest, res) => {
 // PATCH /api/projects/:id/budget/:itemId
 projectsRouter.patch('/:id/budget/:itemId', async (req: AuthRequest, res) => {
   try {
+    const hasAccess = await hasProjectAccess(req.params.id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para modificar este ítem' } });
+      return;
+    }
     const updated = await db.update(budgetItems)
       .set(req.body)
       .where(eq(budgetItems.id, req.params.itemId))
@@ -177,6 +212,11 @@ projectsRouter.patch('/:id/budget/:itemId', async (req: AuthRequest, res) => {
 // DELETE /api/projects/:id/budget/:itemId
 projectsRouter.delete('/:id/budget/:itemId', async (req: AuthRequest, res) => {
   try {
+    const hasAccess = await hasProjectAccess(req.params.id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para eliminar este ítem' } });
+      return;
+    }
     await db.delete(budgetItems).where(eq(budgetItems.id, req.params.itemId));
     res.json({ data: { deleted: true }, error: null });
   } catch (err) {

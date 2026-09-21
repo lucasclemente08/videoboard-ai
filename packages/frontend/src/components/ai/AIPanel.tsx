@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSceneStore } from '../../stores/useSceneStore';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { PremiumModal } from '../premium/PremiumModal';
 
 interface AIChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -16,12 +17,13 @@ interface AIChatMessage {
 export function AIPanel({ onClose }: { onClose: () => void }) {
   const { id: projectId } = useParams<{ id: string }>();
   const { selectedSceneId } = useSceneStore();
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [provider, setProvider] = useState('openai');
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -29,6 +31,12 @@ export function AIPanel({ onClose }: { onClose: () => void }) {
 
   const sendMessage = useCallback(async () => {
     if (!input.trim() || loading) return;
+
+    if (!user?.isPremium) {
+      setShowPremiumModal(true);
+      return;
+    }
+
     const userMsg = input.trim();
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
@@ -134,6 +142,11 @@ export function AIPanel({ onClose }: { onClose: () => void }) {
   ];
 
   const handleQuickAction = async (action: typeof quickActions[0]) => {
+    if (!user?.isPremium) {
+      setShowPremiumModal(true);
+      return;
+    }
+
     if (action.action === 'generate') {
       // Prompt for idea first, then create scenes
       setMessages(prev => [...prev, { role: 'assistant', content: '🎬 ¡Vamos a crear un proyecto! Describí tu idea en el chat y voy a generar las escenas automáticamente. Cuanto más detalle me des (tema, duración, tono, plataforma), mejor será el resultado.', type: 'complete' }]);
@@ -204,6 +217,25 @@ export function AIPanel({ onClose }: { onClose: () => void }) {
           <X className="w-4 h-4 text-text-muted" />
         </button>
       </div>
+
+      {/* Premium Upgrade Banner for Free Users */}
+      {!user?.isPremium && (
+        <div className="mx-4 mt-3 p-3 rounded-xl bg-gradient-to-r from-accent-amber/20 via-accent-amber/10 to-transparent border border-accent-amber/30 flex items-center justify-between shrink-0 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <Zap className="w-4 h-4 text-accent-amber shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-white">IA exclusiva de Creador Pro</p>
+              <p className="text-2xs text-text-muted">Chat, guiones y ritmo por solo $4.99/mes</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowPremiumModal(true)}
+            className="px-2.5 py-1 text-2xs font-semibold bg-accent-amber text-black rounded-lg hover:opacity-90 transition-opacity shrink-0 cursor-pointer"
+          >
+            Activar
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -281,6 +313,8 @@ export function AIPanel({ onClose }: { onClose: () => void }) {
           <span className="text-2xs text-text-muted">Enter para enviar</span>
         </div>
       </div>
+
+      <PremiumModal open={showPremiumModal} onClose={() => setShowPremiumModal(false)} currentToken={token} />
     </motion.div>
   );
 }

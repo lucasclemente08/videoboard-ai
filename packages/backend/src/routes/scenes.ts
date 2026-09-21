@@ -3,9 +3,12 @@ import { eq, asc } from '../config/database';
 import { db } from '../config/database';
 import { scenes, sceneConnections } from '../db/schema/scenes';
 import { authMiddleware, type AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/projectAccess';
 
 export const scenesRouter = Router();
 scenesRouter.use(authMiddleware);
+
+const MAX_FREE_SCENES = 10; // Free tier allows up to 10 scenes per project
 
 // GET /api/scenes?project_id=...
 scenesRouter.get('/', async (req: AuthRequest, res) => {
@@ -15,6 +18,13 @@ scenesRouter.get('/', async (req: AuthRequest, res) => {
       res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'project_id es requerido' } });
       return;
     }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para ver las escenas de este proyecto' } });
+      return;
+    }
+
     const rows = await db.select().from(scenes)
       .where(eq(scenes.project_id, projectId))
       .orderBy(asc(scenes.sort_order));
@@ -33,6 +43,13 @@ scenesRouter.get('/connections', async (req: AuthRequest, res) => {
       res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'project_id es requerido' } });
       return;
     }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para ver las conexiones de este proyecto' } });
+      return;
+    }
+
     const rows = await db.select().from(sceneConnections).where(eq(sceneConnections.project_id, projectId));
     res.json({ data: rows, error: null });
   } catch (err) {
@@ -43,6 +60,12 @@ scenesRouter.get('/connections', async (req: AuthRequest, res) => {
 // POST /api/scenes/connections
 scenesRouter.post('/connections', async (req: AuthRequest, res) => {
   try {
+    const hasAccess = await hasProjectAccess(req.body.project_id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para conectar escenas en este proyecto' } });
+      return;
+    }
+
     const [conn] = await db.insert(sceneConnections).values({
       project_id: req.body.project_id,
       source_scene_id: req.body.source_scene_id,
@@ -92,6 +115,13 @@ scenesRouter.get('/:id', async (req: AuthRequest, res) => {
       res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Escena no encontrada' } });
       return;
     }
+
+    const hasAccess = await hasProjectAccess(rows[0].project_id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para ver esta escena' } });
+      return;
+    }
+
     res.json({ data: rows[0], error: null });
   } catch (err) {
     res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
@@ -101,8 +131,35 @@ scenesRouter.get('/:id', async (req: AuthRequest, res) => {
 // POST /api/scenes
 scenesRouter.post('/', async (req: AuthRequest, res) => {
   try {
+    const projectId = req.body.project_id;
+    if (!projectId) {
+      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'project_id es requerido' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para agregar escenas a este proyecto' } });
+      return;
+    }
+
+    if (!req.isPremium) {
+      const currentScenes = await db.select().from(scenes).where(eq(scenes.project_id, projectId));
+      if (currentScenes.length >= MAX_FREE_SCENES) {
+        res.status(403).json({
+          data: null,
+          error: {
+            code: 'FREE_LIMIT_REACHED',
+            message: `Has alcanzado el límite de ${MAX_FREE_SCENES} escenas por proyecto en el plan Free. Actualizá a Creador Pro ($4.99/mes) para escenas ilimitadas.`,
+            upgradeRequired: true,
+          },
+        });
+        return;
+      }
+    }
+
     const [scene] = await db.insert(scenes).values({
-      project_id: req.body.project_id,
+      project_id: projectId,
       title: req.body.title || 'Nueva escena',
       description: req.body.description || null,
       scene_type: req.body.scene_type || null,
@@ -119,14 +176,22 @@ scenesRouter.post('/', async (req: AuthRequest, res) => {
 // PATCH /api/scenes/:id
 scenesRouter.patch('/:id', async (req: AuthRequest, res) => {
   try {
+    const rows = await db.select().from(scenes).where(eq(scenes.id, req.params.id));
+    if (rows.length === 0) {
+      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Escena no encontrada' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(rows[0].project_id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para modificar esta escena' } });
+      return;
+    }
+
     const updated = await db.update(scenes)
       .set({ ...req.body, updated_at: new Date() })
       .where(eq(scenes.id, req.params.id))
       .returning();
-    if (updated.length === 0) {
-      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Escena no encontrada' } });
-      return;
-    }
     res.json({ data: updated[0], error: null });
   } catch (err) {
     res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: (err as Error).message } });
@@ -136,6 +201,18 @@ scenesRouter.patch('/:id', async (req: AuthRequest, res) => {
 // DELETE /api/scenes/:id
 scenesRouter.delete('/:id', async (req: AuthRequest, res) => {
   try {
+    const rows = await db.select().from(scenes).where(eq(scenes.id, req.params.id));
+    if (rows.length === 0) {
+      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Escena no encontrada' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(rows[0].project_id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para eliminar esta escena' } });
+      return;
+    }
+
     await db.delete(scenes).where(eq(scenes.id, req.params.id));
     res.json({ data: { deleted: true }, error: null });
   } catch (err) {
@@ -152,6 +229,28 @@ scenesRouter.post('/:id/duplicate', async (req: AuthRequest, res) => {
       return;
     }
     const original = rows[0];
+
+    const hasAccess = await hasProjectAccess(original.project_id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para duplicar esta escena' } });
+      return;
+    }
+
+    if (!req.isPremium) {
+      const currentScenes = await db.select().from(scenes).where(eq(scenes.project_id, original.project_id));
+      if (currentScenes.length >= MAX_FREE_SCENES) {
+        res.status(403).json({
+          data: null,
+          error: {
+            code: 'FREE_LIMIT_REACHED',
+            message: `Has alcanzado el límite de ${MAX_FREE_SCENES} escenas por proyecto en el plan Free. Actualizá a Creador Pro ($4.99/mes) para escenas ilimitadas.`,
+            upgradeRequired: true,
+          },
+        });
+        return;
+      }
+    }
+
     const { id, created_at, updated_at, ...rest } = original as any;
     const [duplicate] = await db.insert(scenes).values({
       ...rest,

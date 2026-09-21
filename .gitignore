@@ -3,3 +3,6 @@ dist
 .env
 *.log
 .turbo
+uploads/
+packages/backend/uploads/
+ux_screenshots/

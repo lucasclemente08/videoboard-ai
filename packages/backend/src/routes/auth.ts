@@ -74,8 +74,8 @@ authRouter.post('/login', async (req, res) => {
     let user = rows[0];
 
     if (!user) {
-      // Auto-crear en modo dev si no existe
-      const password_hash = password && password !== 'any' ? hashPassword(password) : null;
+      // Auto-crear si no existe
+      const password_hash = password ? hashPassword(password) : null;
       const [newUser] = await db.insert(users).values({
         id: crypto.randomUUID(),
         email,
@@ -84,7 +84,11 @@ authRouter.post('/login', async (req, res) => {
         role: 'creator',
       }).returning();
       user = newUser;
-    } else if (user.password_hash && password && password !== 'any') {
+    } else if (user.password_hash) {
+      if (!password) {
+        res.status(401).json({ data: null, error: { code: 'INVALID_CREDENTIALS', message: 'Contraseña requerida' } });
+        return;
+      }
       const isValid = verifyPassword(password, user.password_hash);
       if (!isValid) {
         res.status(401).json({ data: null, error: { code: 'INVALID_CREDENTIALS', message: 'Contraseña incorrecta' } });
@@ -142,8 +146,11 @@ authRouter.get('/me', authMiddleware, async (req: AuthRequest, res) => {
       if (subs.length > 0 && subs[0].status === 'active') isPremium = true;
     } catch { /* no subscriptions table */ }
 
+    // Security: never return password_hash
+    const { password_hash: _removed, ...safeUser } = user;
+
     res.json({
-      data: { ...user, isPremium },
+      data: { ...safeUser, isPremium },
       error: null,
     });
   } catch (err) {

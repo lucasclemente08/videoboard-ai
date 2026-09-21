@@ -6,6 +6,7 @@ import { shots } from '../db/schema/shots';
 import { characters, locations } from '../db/schema/characters';
 import { budgetItems } from '../db/schema/comments';
 import { authMiddleware, type AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/projectAccess';
 
 export const exportRouter = Router();
 exportRouter.use(authMiddleware);
@@ -16,6 +17,12 @@ exportRouter.get('/json', async (req: AuthRequest, res) => {
     const projectId = req.query.project_id as string;
     if (!projectId) {
       res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'project_id es requerido' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para exportar este proyecto' } });
       return;
     }
 
@@ -58,6 +65,12 @@ exportRouter.get('/csv', async (req: AuthRequest, res) => {
       return;
     }
 
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para exportar este proyecto' } });
+      return;
+    }
+
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
     const projectScenes = await db.select().from(scenes).where(eq(scenes.project_id, projectId)).orderBy(asc(scenes.sort_order));
 
@@ -92,6 +105,12 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
       return;
     }
 
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).send('<h1>403 Forbidden: No tienes permiso para exportar este proyecto</h1>');
+      return;
+    }
+
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
     if (!project) {
       res.status(404).send('<h1>Proyecto no encontrado</h1>');
@@ -103,6 +122,12 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
     const projectLocations = await db.select().from(locations).where(eq(locations.project_id, projectId));
 
     const totalSeconds = projectScenes.reduce((acc, s) => acc + (s.estimated_duration_secs || 5), 0);
+
+    const watermarkHtml = !req.isPremium ? `
+      <div class="watermark" style="margin-top: 3rem; padding: 1.25rem; border-top: 1px dashed #cbd5e1; text-align: center; color: #64748b; font-size: 0.85rem; page-break-inside: avoid;">
+        ✨ Creado con <strong>VideoBoard AI</strong> (Plan Gratuito) &bull; Para exportar sin marcas de agua y en máxima resolución, actualiza a <strong style="color: #2563eb;">Creador Pro ($4.99/mes)</strong>.
+      </div>
+    ` : '';
 
     const html = `<!DOCTYPE html>
 <html lang="es">
@@ -186,6 +211,8 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
       `).join('')}
     </div>
   ` : ''}
+
+  ${watermarkHtml}
 </body>
 </html>`;
 
