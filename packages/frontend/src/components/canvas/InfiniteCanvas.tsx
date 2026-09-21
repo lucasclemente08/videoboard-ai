@@ -2,7 +2,7 @@ import { useCallback, useRef, useEffect, useState } from 'react';
 import ReactFlow, {
   Background, Controls, MiniMap, useNodesState, useEdgesState,
   Connection, Node, Edge, BackgroundVariant, SelectionMode,
-  ReactFlowProvider, MarkerType,
+  ReactFlowProvider, MarkerType, ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { SceneNode } from '../scene/SceneNode';
@@ -123,9 +123,10 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
   const onConnect = useCallback(async (c: Connection) => {
     if (!c.source || !c.target || c.source === c.target) return;
 
-    // Prevent duplicates
+    // Prevent duplicate connections in either direction
     const exists = connections.some(
-      conn => conn.source_scene_id === c.source && conn.target_scene_id === c.target
+      conn => (conn.source_scene_id === c.source && conn.target_scene_id === c.target) ||
+              (conn.source_scene_id === c.target && conn.target_scene_id === c.source)
     );
     if (exists) return;
 
@@ -437,6 +438,8 @@ export function InfiniteCanvas({ projectId }: { projectId: string }) {
           elevateNodesOnSelect={false} nodesFocusable={false}
           onlyRenderVisibleElements
           proOptions={{ hideAttribution: true }}
+          connectionMode={ConnectionMode.Loose}
+          connectionRadius={32}
           defaultEdgeOptions={{ type: 'connectionLine', style: { stroke: '#3B82F6', strokeWidth: 2.5 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#3B82F6', width: 14, height: 14 } }}
           connectionLineStyle={{ stroke: '#3B82F6', strokeWidth: 2, strokeDasharray: '5,5' }}
           snapToGrid snapGrid={[16, 16]}

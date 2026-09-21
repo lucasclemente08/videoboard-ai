@@ -67,14 +67,14 @@ export const SceneNode = memo(({ data, selected }: NodeProps) => {
       <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{ backgroundColor: scene.color }} />
 
       {/* Handles */}
-      <Handle type="target" position={Position.Top}
-        className="!w-3 !h-3 !bg-accent-blue !border-2 !border-surface-raised opacity-0 group-hover:opacity-100 !-top-1.5 transition-all" />
-      <Handle type="source" position={Position.Bottom}
-        className="!w-3 !h-3 !bg-accent-violet !border-2 !border-surface-raised opacity-0 group-hover:opacity-100 !-bottom-1.5 transition-all" />
       <Handle type="source" position={Position.Right} id="right"
-        className="!w-2 !h-2 !bg-accent-amber !border-2 !border-surface-raised opacity-0 group-hover:opacity-100 !-right-1" />
+        className="!w-3.5 !h-3.5 !bg-accent-blue !border-2 !border-surface-raised !rounded-full opacity-0 group-hover:opacity-100 !-right-1.5 transition-all hover:!scale-125 hover:!ring-4 hover:!ring-accent-blue/30 shadow-md cursor-crosshair z-10" />
       <Handle type="target" position={Position.Left} id="left"
-        className="!w-2 !h-2 !bg-accent-amber !border-2 !border-surface-raised opacity-0 group-hover:opacity-100 !-left-1" />
+        className="!w-3.5 !h-3.5 !bg-accent-blue !border-2 !border-surface-raised !rounded-full opacity-0 group-hover:opacity-100 !-left-1.5 transition-all hover:!scale-125 hover:!ring-4 hover:!ring-accent-blue/30 shadow-md cursor-crosshair z-10" />
+      <Handle type="target" position={Position.Top} id="top"
+        className="!w-3.5 !h-3.5 !bg-accent-blue !border-2 !border-surface-raised !rounded-full opacity-0 group-hover:opacity-100 !-top-1.5 transition-all hover:!scale-125 hover:!ring-4 hover:!ring-accent-blue/30 shadow-md cursor-crosshair z-10" />
+      <Handle type="source" position={Position.Bottom} id="bottom"
+        className="!w-3.5 !h-3.5 !bg-accent-blue !border-2 !border-surface-raised !rounded-full opacity-0 group-hover:opacity-100 !-bottom-1.5 transition-all hover:!scale-125 hover:!ring-4 hover:!ring-accent-blue/30 shadow-md cursor-crosshair z-10" />
 
       {showCompact ? (
         /* COMPACT — just title and color bar */
