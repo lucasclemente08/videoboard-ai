@@ -8,6 +8,7 @@ import { budgetItems } from '../db/schema/comments';
 import { authMiddleware, type AuthRequest } from '../middleware/auth';
 import { hasProjectAccess } from '../middleware/projectAccess';
 import { projectToMarkdown, markdownToProject } from '../services/projectSerializer';
+import { ensureFactoryTemplates } from './templates';
 import crypto from 'crypto';
 
 export const projectsRouter = Router();
@@ -88,7 +89,11 @@ projectsRouter.post('/', async (req: AuthRequest, res) => {
 // GET /api/projects/:id
 projectsRouter.get('/:id', async (req: AuthRequest, res) => {
   try {
-    const rows = await db.select().from(projects).where(eq(projects.id, req.params.id));
+    let rows = await db.select().from(projects).where(eq(projects.id, req.params.id));
+    if (rows.length === 0) {
+      await ensureFactoryTemplates();
+      rows = await db.select().from(projects).where(eq(projects.id, req.params.id));
+    }
     if (rows.length === 0) {
       res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Proyecto no encontrado' } });
       return;
@@ -136,7 +141,11 @@ projectsRouter.get('/:id/raw', async (req: AuthRequest, res) => {
       return;
     }
 
-    const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+    let [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+    if (!project) {
+      await ensureFactoryTemplates();
+      [project] = await db.select().from(projects).where(eq(projects.id, projectId));
+    }
     if (!project) {
       res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Proyecto no encontrado' } });
       return;
@@ -211,18 +220,49 @@ projectsRouter.put('/:id/raw', async (req: AuthRequest, res) => {
     const inputScenes = Array.isArray(bundle.scenes) ? bundle.scenes : [];
     const totalDuration = inputScenes.reduce((acc: number, s: any) => acc + (s.estimated_duration_secs || 5), 0);
 
-    // 1. Update project title and description
-    const [updatedProject] = await db
+    // 1. Update project title, description, and assign owner if needed
+    const updateData: any = {
+      title: bundle.project.title,
+      description: bundle.project.description ?? undefined,
+      status: bundle.project.status || 'planning',
+      estimated_duration_secs: totalDuration,
+      updated_at: new Date(),
+    };
+    if (req.userId) {
+      updateData.owner_id = req.userId;
+    }
+
+    let [updatedProject] = await db
       .update(projects)
-      .set({
-        title: bundle.project.title,
-        description: bundle.project.description ?? undefined,
-        status: bundle.project.status || 'planning',
-        estimated_duration_secs: totalDuration,
-        updated_at: new Date(),
-      })
+      .set(updateData)
       .where(eq(projects.id, projectId))
       .returning();
+
+    if (!updatedProject) {
+      const [newProj] = await db
+        .insert(projects)
+        .values({
+          id: projectId,
+          title: bundle.project.title,
+          description: bundle.project.description || null,
+          status: bundle.project.status || 'planning',
+          estimated_duration_secs: totalDuration,
+          owner_id: req.userId || null,
+          is_template: false,
+        })
+        .returning();
+      updatedProject = newProj;
+    }
+
+    if (req.userId) {
+      try {
+        await db.insert(projectMembers).values({
+          project_id: projectId,
+          user_id: req.userId,
+          role: 'owner',
+        });
+      } catch { /* ignore if already member */ }
+    }
 
     // 2. Clear old scenes and connections to cleanly re-populate from the raw modified state
     await db.delete(scenes).where(eq(scenes.project_id, projectId));

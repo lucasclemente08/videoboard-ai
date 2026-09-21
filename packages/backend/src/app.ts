@@ -15,12 +15,17 @@ import { aiRouter } from './routes/ai';
 import { exportRouter } from './routes/export';
 import { premiumRouter } from './routes/premium';
 import { presetsRouter } from './routes/presets';
-import { templatesRouter } from './routes/templates';
+import { templatesRouter, ensureFactoryTemplates } from './routes/templates';
 import { shareRouter } from './routes/share';
 import { apiDocsRoute } from './routes/docs';
 
 export function createApp() {
   const app = express();
+
+  // Eagerly initialize factory templates so they exist in memory/db from startup
+  ensureFactoryTemplates().catch((err) => {
+    console.error('Failed to pre-seed factory templates:', err);
+  });
 
   const uploadsDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsDir)) {

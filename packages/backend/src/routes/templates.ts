@@ -1084,7 +1084,7 @@ const FACTORY_TEMPLATES = [
 ];
 
 // Helper to seed or update factory templates with all pre-made scenes and shots
-async function ensureFactoryTemplates() {
+export async function ensureFactoryTemplates() {
   for (const tpl of FACTORY_TEMPLATES) {
     try {
       const existing = await db.select().from(projects).where(eq(projects.id, tpl.id));
