@@ -83,6 +83,18 @@ scenesRouter.post('/connections', async (req: AuthRequest, res) => {
 // DELETE /api/scenes/connections/:id
 scenesRouter.delete('/connections/:id', async (req: AuthRequest, res) => {
   try {
+    const connRows = await db.select().from(sceneConnections).where(eq(sceneConnections.id, req.params.id));
+    if (connRows.length === 0) {
+      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Conexión no encontrada' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(connRows[0].project_id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para eliminar esta conexión' } });
+      return;
+    }
+
     await db.delete(sceneConnections).where(eq(sceneConnections.id, req.params.id));
     res.json({ data: { deleted: true }, error: null });
   } catch (err) {
@@ -98,6 +110,18 @@ scenesRouter.post('/reorder', async (req: AuthRequest, res) => {
       res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'scene_ids debe ser un array' } });
       return;
     }
+
+    if (scene_ids.length > 0) {
+      const firstSceneRows = await db.select().from(scenes).where(eq(scenes.id, scene_ids[0]));
+      if (firstSceneRows.length > 0) {
+        const hasAccess = await hasProjectAccess(firstSceneRows[0].project_id, req.userId);
+        if (!hasAccess) {
+          res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para reordenar las escenas de este proyecto' } });
+          return;
+        }
+      }
+    }
+
     for (let i = 0; i < scene_ids.length; i++) {
       await db.update(scenes).set({ sort_order: i }).where(eq(scenes.id, scene_ids[i]));
     }

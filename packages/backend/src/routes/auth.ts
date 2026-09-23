@@ -94,6 +94,18 @@ authRouter.post('/login', async (req, res) => {
         res.status(401).json({ data: null, error: { code: 'INVALID_CREDENTIALS', message: 'Contraseña incorrecta' } });
         return;
       }
+    } else {
+      // User exists but has no password set yet
+      if (password && password.trim()) {
+        const password_hash = hashPassword(password);
+        await db.update(users).set({ password_hash, updated_at: new Date() }).where(eq(users.id, user.id));
+      } else {
+        res.status(401).json({
+          data: null,
+          error: { code: 'PASSWORD_REQUIRED', message: 'Esta cuenta requiere ingresar una contraseña para iniciar sesión.' },
+        });
+        return;
+      }
     }
 
     // Comprobar suscripción premium

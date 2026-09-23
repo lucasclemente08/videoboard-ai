@@ -1,6 +1,7 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { verifyToken } from './jwt';
+import { hasProjectAccess } from '../middleware/projectAccess';
 
 interface CursorPosition {
   x: number;
@@ -18,21 +19,41 @@ interface UserPresence {
 const USER_COLORS = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'];
 
 export function createCollaborationServer(httpServer: HttpServer) {
+  const allowedOrigins = process.env.CLIENT_URL
+    ? [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000']
+    : ['http://localhost:5173', 'http://localhost:3000'];
+
   const io = new Server(httpServer, {
-    cors: { origin: '*', methods: ['GET', 'POST'] },
+    cors: {
+      origin: allowedOrigins,
+      methods: ['GET', 'POST'],
+      credentials: true,
+    },
     pingTimeout: 60000,
   });
 
   // Verify handshake auth
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
-    if (token && token !== 'demo-token') {
+    if (token) {
+      if (token === 'demo-token') {
+        if (process.env.NODE_ENV !== 'production') {
+          socket.data.userId = 'demo-user-id';
+          socket.data.userName = 'Usuario Demo';
+          return next();
+        }
+      }
       const payload = verifyToken(token);
       if (payload) {
         socket.data.userId = payload.sub;
         socket.data.userEmail = payload.email;
         socket.data.userName = payload.name;
+        return next();
       }
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      return next(new Error('Authentication token required'));
     }
     next();
   });
@@ -44,10 +65,18 @@ export function createCollaborationServer(httpServer: HttpServer) {
     console.log(`🔗 User connected: ${socket.id}`);
 
     // Join project room
-    socket.on('join-room', ({ projectId, userName }: { projectId: string; userName: string }) => {
+    socket.on('join-room', async ({ projectId, userName }: { projectId: string; userName: string }) => {
+      if (!projectId) return;
+
+      const hasAccess = await hasProjectAccess(projectId, socket.data.userId);
+      if (!hasAccess) {
+        socket.emit('error', { code: 'FORBIDDEN', message: 'No tienes permiso para unirte a este proyecto' });
+        return;
+      }
+
       socket.join(projectId);
       socket.data.projectId = projectId;
-      socket.data.userName = userName || 'Anónimo';
+      socket.data.userName = userName || socket.data.userName || 'Anónimo';
       socket.data.userColor = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
 
       // Track presence

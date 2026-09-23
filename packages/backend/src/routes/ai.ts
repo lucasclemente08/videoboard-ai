@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { chatWithAI, chatWithAISync, type AIRequest, type ProjectContext } from '../services/ai-context';
 import { getProvider, autoRegisterProviders } from '../services/ai-providers';
 import { authMiddleware, premiumMiddleware, type AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/projectAccess';
 import { db, eq } from '../config/database';
 import { scenes, sceneConnections } from '../db/schema/scenes';
 import { projects } from '../db/schema/projects';
@@ -44,6 +45,12 @@ aiRouter.post('/chat', async (req: AuthRequest, res) => {
       return;
     }
 
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ error: { message: 'No tienes permiso para acceder a este proyecto' } });
+      return;
+    }
+
     // Build project context safely
     const projectRows = await db.select().from(projects).where(eq(projects.id, projectId));
     const project = projectRows?.[0];
@@ -81,13 +88,13 @@ aiRouter.post('/chat', async (req: AuthRequest, res) => {
       },
     };
 
+    const stream = await chatWithAI(request);
+
     // Stream response
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-
-    const stream = await chatWithAI(request);
 
     for await (const chunk of stream) {
       res.write(chunk);
@@ -106,6 +113,12 @@ aiRouter.post('/generate-project', async (req: AuthRequest, res) => {
     const { idea, projectId, provider, options } = req.body;
     if (!idea || !projectId) {
       res.status(400).json({ error: { message: 'idea and projectId are required' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ error: { message: 'No tienes permiso para modificar este proyecto' } });
       return;
     }
 
@@ -146,6 +159,12 @@ aiRouter.post('/analyze-scene', async (req: AuthRequest, res) => {
       return;
     }
 
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ error: { message: 'No tienes permiso para acceder a este proyecto' } });
+      return;
+    }
+
     const scenesRows = await db.select().from(scenes).where(eq(scenes.project_id, projectId));
     const scene = (scenesRows || []).find((s: any) => s.id === sceneId);
 
@@ -181,6 +200,12 @@ aiRouter.post('/optimize-for-platform', async (req: AuthRequest, res) => {
       return;
     }
 
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ error: { message: 'No tienes permiso para acceder a este proyecto' } });
+      return;
+    }
+
     const scenesRows = await db.select().from(scenes).where(eq(scenes.project_id, projectId));
     const scenesText = (scenesRows || []).map((s: any, idx: number) => `Escena ${idx + 1}: ${s.title}\n${s.description || ''}`).join('\n\n');
 
@@ -208,6 +233,12 @@ aiRouter.post('/create-scenes', async (req: AuthRequest, res) => {
     const { projectId, idea, provider, options } = req.body;
     if (!projectId || !idea) {
       res.status(400).json({ error: { message: 'projectId and idea are required' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ error: { message: 'No tienes permiso para agregar escenas a este proyecto' } });
       return;
     }
 
@@ -330,10 +361,15 @@ aiRouter.post('/generate-shot-image', async (req: AuthRequest, res) => {
       if (sceneRows.length > 0) scene = sceneRows[0];
     }
 
-    // 3. Fetch characters for character consistency
+    // 3. Fetch characters for character consistency & check authorization
     let projectCharacters: any[] = [];
     const targetProjectId = projectId || scene?.project_id;
     if (targetProjectId) {
+      const hasAccess = await hasProjectAccess(targetProjectId, req.userId);
+      if (!hasAccess) {
+        res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para modificar esta toma' } });
+        return;
+      }
       try {
         projectCharacters = await db.select().from(characters).where(eq(characters.project_id, targetProjectId));
       } catch {}

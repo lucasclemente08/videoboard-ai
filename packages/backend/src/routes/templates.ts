@@ -1313,6 +1313,15 @@ templatesRouter.post('/:id/clone', authMiddleware, async (req: AuthRequest, res)
 
     const tpl = tplRows[0];
 
+    // Security: Only allow cloning if the project is marked as a template or the user has access to it
+    if (!tpl.is_template) {
+      const hasAccess = await hasProjectAccess(templateId, req.userId);
+      if (!hasAccess) {
+        res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para clonar este proyecto privado' } });
+        return;
+      }
+    }
+
     // Create cloned project under user's ownership
     const newProjectId = crypto.randomUUID();
     const [newProject] = await db

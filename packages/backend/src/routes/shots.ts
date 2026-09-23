@@ -47,11 +47,37 @@ shotsRouter.get('/', async (req: AuthRequest, res) => {
   }
 });
 
+async function getShotProjectId(shotId: string): Promise<string | null> {
+  const shotRows = await db.select().from(shots).where(eq(shots.id, shotId));
+  if (shotRows.length === 0 || !shotRows[0].scene_id) return null;
+  const sceneRows = await db.select().from(scenes).where(eq(scenes.id, shotRows[0].scene_id));
+  if (sceneRows.length === 0 || !sceneRows[0].project_id) return null;
+  return sceneRows[0].project_id;
+}
+
 // POST /api/shots
 shotsRouter.post('/', async (req: AuthRequest, res) => {
   try {
+    const sceneId = req.body.scene_id;
+    if (!sceneId) {
+      res.status(400).json({ data: null, error: { code: 'BAD_REQUEST', message: 'scene_id es requerido' } });
+      return;
+    }
+
+    const sceneRows = await db.select().from(scenes).where(eq(scenes.id, sceneId));
+    if (sceneRows.length === 0) {
+      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Escena no encontrada' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(sceneRows[0].project_id, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para agregar tomas a esta escena' } });
+      return;
+    }
+
     const [shot] = await db.insert(shots).values({
-      scene_id: req.body.scene_id,
+      scene_id: sceneId,
       name: req.body.name || 'Nueva toma',
       description: req.body.description || null,
       shot_type: req.body.shot_type || null,
@@ -73,6 +99,18 @@ shotsRouter.post('/', async (req: AuthRequest, res) => {
 // PATCH /api/shots/:id
 shotsRouter.patch('/:id', async (req: AuthRequest, res) => {
   try {
+    const projectId = await getShotProjectId(req.params.id);
+    if (!projectId) {
+      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Toma no encontrada' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para modificar esta toma' } });
+      return;
+    }
+
     const updated = await db.update(shots)
       .set({ ...req.body, updated_at: new Date() })
       .where(eq(shots.id, req.params.id))
@@ -90,6 +128,18 @@ shotsRouter.patch('/:id', async (req: AuthRequest, res) => {
 // DELETE /api/shots/:id
 shotsRouter.delete('/:id', async (req: AuthRequest, res) => {
   try {
+    const projectId = await getShotProjectId(req.params.id);
+    if (!projectId) {
+      res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Toma no encontrada' } });
+      return;
+    }
+
+    const hasAccess = await hasProjectAccess(projectId, req.userId);
+    if (!hasAccess) {
+      res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para eliminar esta toma' } });
+      return;
+    }
+
     await db.delete(shots).where(eq(shots.id, req.params.id));
     res.json({ data: { deleted: true }, error: null });
   } catch (err) {
@@ -106,6 +156,18 @@ shotsRouter.post('/:id/takes', async (req: AuthRequest, res) => {
       return;
     }
     const currentShot = shotRows[0];
+
+    if (currentShot.scene_id) {
+      const sceneRows = await db.select().from(scenes).where(eq(scenes.id, currentShot.scene_id));
+      if (sceneRows.length > 0 && sceneRows[0].project_id) {
+        const hasAccess = await hasProjectAccess(sceneRows[0].project_id, req.userId);
+        if (!hasAccess) {
+          res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para agregar tomas rodadas a esta toma' } });
+          return;
+        }
+      }
+    }
+
     const existingTakes: any[] = Array.isArray(currentShot.takes) ? currentShot.takes : [];
     
     const newTake = {
@@ -142,6 +204,18 @@ shotsRouter.delete('/:id/takes/:takeId', async (req: AuthRequest, res) => {
       return;
     }
     const currentShot = shotRows[0];
+
+    if (currentShot.scene_id) {
+      const sceneRows = await db.select().from(scenes).where(eq(scenes.id, currentShot.scene_id));
+      if (sceneRows.length > 0 && sceneRows[0].project_id) {
+        const hasAccess = await hasProjectAccess(sceneRows[0].project_id, req.userId);
+        if (!hasAccess) {
+          res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'No tienes permiso para eliminar tomas rodadas de esta toma' } });
+          return;
+        }
+      }
+    }
+
     const existingTakes: any[] = Array.isArray(currentShot.takes) ? currentShot.takes : [];
     const updatedTakes = existingTakes.filter((t: any) => t.id !== req.params.takeId);
 

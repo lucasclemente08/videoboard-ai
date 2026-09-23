@@ -19,7 +19,24 @@ export const premiumRouter = Router();
 premiumRouter.post('/webhook', async (req, res) => {
   let event: any = req.body;
 
-  if (stripe && isStripeConfigured && req.headers['stripe-signature'] && env.STRIPE_WEBHOOK_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    const sig = req.headers['stripe-signature'];
+    if (!sig || !env.STRIPE_WEBHOOK_SECRET || !stripe) {
+      res.status(400).send('Webhook Error: Stripe signature and webhook secret are required in production');
+      return;
+    }
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig as string,
+        env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err: any) {
+      console.error('⚠️  Webhook signature verification failed:', err.message);
+      res.status(400).send(`Webhook Error: ${err.message}`);
+      return;
+    }
+  } else if (stripe && isStripeConfigured && req.headers['stripe-signature'] && env.STRIPE_WEBHOOK_SECRET) {
     try {
       event = stripe.webhooks.constructEvent(
         req.body,
@@ -189,7 +206,19 @@ premiumRouter.post('/verify-session', async (req: AuthRequest, res) => {
     let customerId: string | null = null;
     let subscriptionId: string | null = null;
 
-    if (stripe && isStripeConfigured && sessionId && !sessionId.startsWith('sim_')) {
+    if (process.env.NODE_ENV === 'production') {
+      if (!stripe || !isStripeConfigured || !sessionId || sessionId.startsWith('sim_')) {
+        res.status(400).json({ data: null, error: { code: 'INVALID_SESSION', message: 'ID de sesión de Stripe no válido' } });
+        return;
+      }
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (session.payment_status !== 'paid' && session.status !== 'complete') {
+        res.status(400).json({ data: null, error: { code: 'PAYMENT_INCOMPLETE', message: 'El pago no ha sido completado' } });
+        return;
+      }
+      customerId = session.customer as string;
+      subscriptionId = session.subscription as string;
+    } else if (stripe && isStripeConfigured && sessionId && !sessionId.startsWith('sim_')) {
       try {
         const session = await stripe.checkout.sessions.retrieve(sessionId);
         if (session.payment_status === 'paid' || session.status === 'complete') {
@@ -300,8 +329,16 @@ premiumRouter.post('/portal', async (req: AuthRequest, res) => {
   }
 });
 
-// POST /api/premium/activate — Activación directa (para pruebas o fallback de compra)
+// POST /api/premium/activate — Activación directa (solo en desarrollo / pruebas locales)
 premiumRouter.post('/activate', async (req: AuthRequest, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(403).json({
+      data: null,
+      error: { code: 'FORBIDDEN', message: 'La activación directa no está permitida en entorno de producción.' },
+    });
+    return;
+  }
+
   try {
     const interval = req.body.interval === 'year' ? 'year' : 'month';
     const plan = interval === 'year' ? PRICING_PLANS.yearly : PRICING_PLANS.monthly;

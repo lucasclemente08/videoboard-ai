@@ -126,9 +126,17 @@ assetsRouter.post('/upload', async (req: AuthRequest, res) => {
 // GET /api/assets/pexels?query=...&type=photo|video
 assetsRouter.get('/pexels', async (req: AuthRequest, res) => {
   try {
+    const apiKey = process.env.PEXELS_API_KEY;
+    if (!apiKey) {
+      res.status(503).json({
+        data: null,
+        error: { code: 'PEXELS_NOT_CONFIGURED', message: 'La integración con Pexels no está configurada en el servidor (falta PEXELS_API_KEY).' },
+      });
+      return;
+    }
+
     const query = (req.query.query as string) || '';
     const type = (req.query.type as string) || 'photo';
-    const apiKey = process.env.PEXELS_API_KEY || 'OC6zUhgrSOxHW2dM9TlHNp9wpQkusqQMoifWBXeZZSlYPdwe8g9Nr7ZM';
 
     const endpoint = type === 'photo'
       ? `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=20&orientation=landscape`

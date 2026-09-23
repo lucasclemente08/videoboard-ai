@@ -2,12 +2,22 @@ import http from 'http';
 import { createApp } from './app';
 import { createCollaborationServer } from './services/collaboration';
 import { io } from 'socket.io-client';
+import { db, eq, initPromise } from './config/database';
+import { projects } from './db/schema/projects';
 
 const PORT = 3099;
 const URL = `http://localhost:${PORT}`;
 const ROOM_ID = 'test-collab-room-2026';
 
 console.log('🚀 Starting Self-Contained Real-Time Collaboration Test Script...');
+
+await initPromise;
+// Create public test room project
+await db.insert(projects).values({
+  id: ROOM_ID,
+  title: 'Collab Test Project',
+  is_template: true,
+});
 
 const app = createApp();
 const server = http.createServer(app);

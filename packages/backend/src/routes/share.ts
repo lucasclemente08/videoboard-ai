@@ -6,10 +6,26 @@ import { shots } from '../db/schema/shots';
 import { users } from '../db/schema/users';
 import { authMiddleware, type AuthRequest } from '../middleware/auth';
 import { hasProjectAccess } from '../middleware/projectAccess';
+import { hashPassword, verifyPassword } from '../services/password';
 import { env } from '../config/env';
 import crypto from 'crypto';
 
 export const shareRouter = Router();
+
+function checkSharePassword(provided: string, stored: string): boolean {
+  if (!provided || !stored) return false;
+  if (stored.includes(':')) {
+    if (verifyPassword(provided, stored)) return true;
+  }
+  try {
+    const provBuf = Buffer.from(provided);
+    const storeBuf = Buffer.from(stored);
+    if (provBuf.length === storeBuf.length && crypto.timingSafeEqual(provBuf, storeBuf)) {
+      return true;
+    }
+  } catch {}
+  return false;
+}
 
 // 1. POST /api/share/link/:projectId — Generate or update client share link
 shareRouter.post('/link/:projectId', authMiddleware, async (req: AuthRequest, res) => {
@@ -38,7 +54,7 @@ shareRouter.post('/link/:projectId', authMiddleware, async (req: AuthRequest, re
     if (removePassword) {
       newPassword = null;
     } else if (password && password.trim()) {
-      newPassword = password.trim();
+      newPassword = hashPassword(password.trim());
     }
 
     const [updated] = await db
@@ -118,8 +134,8 @@ shareRouter.get('/view/:token', async (req, res) => {
 
     // Password verification if protected
     if (project.share_password) {
-      const provided = (req.headers['x-share-password'] as string) || (req.query.pwd as string);
-      if (!provided || provided !== project.share_password) {
+      const provided = (req.headers['x-share-password'] as string) || '';
+      if (!checkSharePassword(provided, project.share_password)) {
         res.status(401).json({
           data: {
             requirePassword: true,
@@ -197,7 +213,7 @@ shareRouter.post('/view/:token/approval', async (req, res) => {
     // Password verification if protected
     if (project.share_password) {
       const provided = (req.headers['x-share-password'] as string) || req.body.password;
-      if (!provided || provided !== project.share_password) {
+      if (!checkSharePassword(provided, project.share_password)) {
         res.status(401).json({ data: null, error: { code: 'UNAUTHORIZED', message: 'Contraseña incorrecta' } });
         return;
       }

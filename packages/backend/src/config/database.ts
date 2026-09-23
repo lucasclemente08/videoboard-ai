@@ -2,10 +2,10 @@ import { env } from './env';
 import { createMemDb, eq as memEq, asc as memAsc, desc as memDesc } from './memdb';
 import * as schema from '../db/schema';
 
-let db: ReturnType<typeof createMemDb>;
-let eq: typeof memEq;
-let asc: typeof memAsc;
-let desc: typeof memDesc;
+let db: ReturnType<typeof createMemDb> = createMemDb();
+let eq: typeof memEq = memEq;
+let asc: typeof memAsc = memAsc;
+let desc: typeof memDesc = memDesc;
 
 async function initDb() {
   // Try PostgreSQL first

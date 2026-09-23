@@ -150,6 +150,16 @@ exportRouter.get('/csv', async (req: AuthRequest, res) => {
   }
 });
 
+function escapeHtml(str: any): string {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // GET /api/export/pdf?project_id=... or GET /api/export/html?project_id=...
 exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
   try {
@@ -195,7 +205,7 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Dossier de Producción: ${project.title}</title>
+  <title>Dossier de Producción: ${escapeHtml(project.title)}</title>
   <style>
     @page { size: A4; margin: 1.5cm; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111; line-height: 1.5; padding: 2rem; background: #fff; }
@@ -226,8 +236,8 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
   </div>
 
   <div class="header">
-    <h1>🎬 ${project.title}</h1>
-    <p style="margin: 0; color: #4b5563;">${project.description || 'Dossier y Guion Técnico de Preproducción'}</p>
+    <h1>🎬 ${escapeHtml(project.title)}</h1>
+    <p style="margin: 0; color: #4b5563;">${escapeHtml(project.description || 'Dossier y Guion Técnico de Preproducción')}</p>
     <div class="meta">
       <div class="meta-item"><strong>Escenas:</strong> ${projectScenes.length}</div>
       <div class="meta-item"><strong>Duración Estimada:</strong> ${Math.round(totalSeconds / 60)} min (${totalSeconds}s)</div>
@@ -239,12 +249,12 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
   ${projectScenes.map((s, idx) => `
     <div class="scene-card">
       <div class="scene-header">
-        <h3 class="scene-title">#${idx + 1}. ${s.title}</h3>
-        <span class="scene-time">${s.estimated_duration_secs || 5} seg &bull; <span class="badge">${s.status || 'Borrador'}</span></span>
+        <h3 class="scene-title">#${idx + 1}. ${escapeHtml(s.title)}</h3>
+        <span class="scene-time">${s.estimated_duration_secs || 5} seg &bull; <span class="badge">${escapeHtml(s.status || 'Borrador')}</span></span>
       </div>
       <div class="scene-body">
-        <p><strong>Descripción / Acción:</strong> ${s.description || 'Sin descripción'}</p>
-        ${s.script_content ? `<p style="margin-top: 0.5rem; background: #f9fafb; padding: 0.75rem; border-radius: 4px; font-style: italic;">${s.script_content}</p>` : ''}
+        <p><strong>Descripción / Acción:</strong> ${escapeHtml(s.description || 'Sin descripción')}</p>
+        ${s.script_content ? `<p style="margin-top: 0.5rem; background: #f9fafb; padding: 0.75rem; border-radius: 4px; font-style: italic;">${escapeHtml(s.script_content)}</p>` : ''}
       </div>
     </div>
   `).join('')}
@@ -254,9 +264,9 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
     <div class="grid">
       ${projectCharacters.map(c => `
         <div class="grid-item">
-          <strong>${c.name}</strong><br>
-          <span style="color: #6b7280;">Actor: ${c.actor_name || 'Sin asignar'}</span>
-          ${c.wardrobe ? `<br><span style="color: #6b7280;">Vestuario: ${c.wardrobe}</span>` : ''}
+          <strong>${escapeHtml(c.name)}</strong><br>
+          <span style="color: #6b7280;">Actor: ${escapeHtml(c.actor_name || 'Sin asignar')}</span>
+          ${c.wardrobe ? `<br><span style="color: #6b7280;">Vestuario: ${escapeHtml(c.wardrobe)}</span>` : ''}
         </div>
       `).join('')}
     </div>
@@ -267,8 +277,8 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
     <div class="grid">
       ${projectLocations.map(l => `
         <div class="grid-item">
-          <strong>${l.name}</strong><br>
-          <span style="color: #6b7280;">Dirección: ${l.address || 'Por definir'}</span>
+          <strong>${escapeHtml(l.name)}</strong><br>
+          <span style="color: #6b7280;">Dirección: ${escapeHtml(l.address || 'Por definir')}</span>
         </div>
       `).join('')}
     </div>
@@ -280,18 +290,18 @@ exportRouter.get(['/pdf', '/html', '/print'], async (req: AuthRequest, res) => {
       ${allShots.map(sh => `
         <div class="grid-item" style="border-left: 3px solid #3b82f6;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-            <strong>${sh.name} ${sh.camera_letter ? `<span class="badge">CÁM ${sh.camera_letter}</span>` : ''}</strong>
-            <span style="font-size:0.75rem; color:#6b7280;">${sh.sceneTitle || ''} &bull; ${sh.estimated_duration_secs || 5}s</span>
+            <strong>${escapeHtml(sh.name)} ${sh.camera_letter ? `<span class="badge">CÁM ${escapeHtml(sh.camera_letter)}</span>` : ''}</strong>
+            <span style="font-size:0.75rem; color:#6b7280;">${escapeHtml(sh.sceneTitle || '')} &bull; ${sh.estimated_duration_secs || 5}s</span>
           </div>
           <div style="font-size: 0.85rem; color: #374151; line-height: 1.4;">
-            <span style="color: #2563eb; font-weight:600;">Cámara & Óptica:</span> ${sh.camera_setup?.camera_model || 'Cámara Principal'} | Lente ${sh.camera_setup?.lens || sh.lens || '35mm'} (${sh.camera_setup?.aperture || 'f/2.0'}) | ${sh.fps || 24}fps | ISO ${sh.camera_setup?.iso || 800}<br>
-            <span style="color: #4b5563;">Perfil / Shutter:</span> ${sh.camera_setup?.color_profile || 'Rec.709'} &bull; ${sh.camera_setup?.shutter_speed || '1/48'} ${sh.camera_setup?.nd_filter ? `&bull; ${sh.camera_setup.nd_filter}` : ''}<br>
+            <span style="color: #2563eb; font-weight:600;">Cámara & Óptica:</span> ${escapeHtml(sh.camera_setup?.camera_model || 'Cámara Principal')} | Lente ${escapeHtml(sh.camera_setup?.lens || sh.lens || '35mm')} (${escapeHtml(sh.camera_setup?.aperture || 'f/2.0')}) | ${sh.fps || 24}fps | ISO ${sh.camera_setup?.iso || 800}<br>
+            <span style="color: #4b5563;">Perfil / Shutter:</span> ${escapeHtml(sh.camera_setup?.color_profile || 'Rec.709')} &bull; ${escapeHtml(sh.camera_setup?.shutter_speed || '1/48')} ${sh.camera_setup?.nd_filter ? `&bull; ${escapeHtml(sh.camera_setup.nd_filter)}` : ''}<br>
             ${sh.lighting_setup?.key_light?.type ? `
               <div style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e5e7eb;">
-                <span style="color: #d97706; font-weight:600;">Iluminación:</span> Key: ${sh.lighting_setup.key_light.type} (${sh.lighting_setup.key_light.color_temp || '5600K'}) &bull; Fill: ${sh.lighting_setup.fill_light?.type || 'Rebote'} &bull; Rim: ${sh.lighting_setup.back_light?.type || 'Luz de contra'}
+                <span style="color: #d97706; font-weight:600;">Iluminación:</span> Key: ${escapeHtml(sh.lighting_setup.key_light.type)} (${escapeHtml(sh.lighting_setup.key_light.color_temp || '5600K')}) &bull; Fill: ${escapeHtml(sh.lighting_setup.fill_light?.type || 'Rebote')} &bull; Rim: ${escapeHtml(sh.lighting_setup.back_light?.type || 'Luz de contra')}
               </div>
             ` : ''}
-            ${sh.notes ? `<div style="margin-top: 4px; font-style: italic; color: #6b7280;">Nota: ${sh.notes}</div>` : ''}
+            ${sh.notes ? `<div style="margin-top: 4px; font-style: italic; color: #6b7280;">Nota: ${escapeHtml(sh.notes)}</div>` : ''}
           </div>
         </div>
       `).join('')}
